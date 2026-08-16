@@ -12,7 +12,7 @@ struct ContentView: View {
     
     var body: some View {
         ZStack {
-            AnimatedSpaceBackground()
+            AnimatedSpaceBackground(gameState: gameState)
                 .ignoresSafeArea()
             
             if !gameState.isInMenu {

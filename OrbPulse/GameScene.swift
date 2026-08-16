@@ -319,7 +319,7 @@ final class GameScene: SKScene {
         case OrbType.feverGold.identifier:
             gameState?.combo += 1
             gameState?.addScore(points: 30)
-            FeedbackManager.shared.playPowerup()
+            FeedbackManager.shared.playGoldCatch()
             createBurstEffect(at: orb.position, color: .yellow)
             orb.removeFromParent()
             
