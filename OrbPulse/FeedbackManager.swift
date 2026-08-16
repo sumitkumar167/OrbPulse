@@ -1,3 +1,11 @@
+//
+//  FeedbackManager.swift
+//  OrbPulse
+//
+//  Created by Sumit Kumar on 16/08/26.
+//
+
+
 import AVFoundation
 import CoreHaptics
 
