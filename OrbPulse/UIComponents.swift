@@ -6,41 +6,62 @@
 //
 import SwiftUI
 
-// MARK: - Zero-Stutter Space Background
+// MARK: - Zero-Stutter Space Background (With Subtle Record-Breaker Horizon)
 struct AnimatedSpaceBackground: View {
     @ObservedObject var gameState: GameState
     
     @State private var starOffset: CGFloat = 0
     
+    var isFever: Bool { gameState.isFeverActive }
+    var isRecordRun: Bool { gameState.hasBeatenHighScoreThisRun }
+    
     var body: some View {
         ZStack {
-            // 1. Dark Base
+            // 1. Dark Base Obsidian Cosmos
             Color(red: 0.03, green: 0.03, blue: 0.06)
             
-            // 2. Fever Glow (Pure Alpha Interpolation)
+            // 2. Subtle High-Score Horizon Sheen (Smooth transition when breaking personal best)
+            RadialGradient(
+                colors: [
+                    Color(red: 1.0, green: 0.82, blue: 0.28).opacity(isRecordRun ? 0.15 : 0.0),
+                    Color.clear
+                ],
+                center: .bottom,
+                startRadius: 10,
+                endRadius: 450
+            )
+            .animation(.easeInOut(duration: 1.2), value: isRecordRun)
+            
+            // 3. Pulse Rush Glow Layer
             RadialGradient(
                 colors: [Color.yellow.opacity(0.35), Color.clear],
                 center: .bottom,
                 startRadius: 20,
                 endRadius: 400
             )
-            .opacity(gameState.isFeverActive ? 1.0 : 0.0)
-            .animation(.linear(duration: 0.3), value: gameState.isFeverActive)
+            .opacity(isFever ? 1.0 : 0.0)
+            .animation(.linear(duration: 0.3), value: isFever)
             
-            // 3. Normal Horizon Glow
+            // 4. Default Ambient Horizon Glow
             LinearGradient(
-                colors: [Color.clear, Color.cyan.opacity(0.12), Color.purple.opacity(0.18)],
+                colors: [
+                    Color.clear,
+                    isRecordRun ? Color.yellow.opacity(0.12) : Color.cyan.opacity(0.12),
+                    isRecordRun ? Color(red: 0.85, green: 0.45, blue: 0.15).opacity(0.18) : Color.purple.opacity(0.18)
+                ],
                 startPoint: .top,
                 endPoint: .bottom
             )
             .frame(height: 260)
             .frame(maxHeight: .infinity, alignment: .bottom)
-            .opacity(gameState.isFeverActive ? 0.0 : 1.0)
-            .animation(.linear(duration: 0.3), value: gameState.isFeverActive)
+            .opacity(isFever ? 0.0 : 1.0)
+            .animation(.easeInOut(duration: 0.8), value: isRecordRun)
+            .animation(.linear(duration: 0.3), value: isFever)
             
-            // 4. Parallax Stars
-            StarCanvas()
+            // 5. Parallax Stars (Subtle golden stardust on record run)
+            StarCanvas(isRecordRun: isRecordRun)
                 .offset(y: starOffset)
+                .animation(.easeInOut(duration: 1.0), value: isRecordRun)
         }
         .onAppear {
             withAnimation(.linear(duration: 15).repeatForever(autoreverses: false)) {
@@ -51,20 +72,30 @@ struct AnimatedSpaceBackground: View {
 }
 
 private struct StarCanvas: View {
+    var isRecordRun: Bool
+    
     var body: some View {
         Canvas { ctx, size in
-            for i in 0..<30 {
+            for i in 0..<32 {
                 let px = Double((i * 97) % 1000) / 1000.0 * size.width
                 let py = Double((i * 137) % 1000) / 1000.0 * (size.height + 400) - 200
                 let s = Double((i % 2) + 1)
                 
                 let rect = CGRect(x: px, y: py, width: s, height: s)
-                ctx.fill(Path(ellipseIn: rect), with: .color(Color.white.opacity(0.65)))
+                
+                // When in record run, every 3rd star takes on a subtle golden tint
+                let starColor: Color
+                if isRecordRun && (i % 3 == 0) {
+                    starColor = Color(red: 1.0, green: 0.88, blue: 0.45).opacity(0.85)
+                } else {
+                    starColor = Color.white.opacity(0.65)
+                }
+                
+                ctx.fill(Path(ellipseIn: rect), with: .color(starColor))
             }
         }
     }
 }
-
 // MARK: - Landing Page View
 struct LandingView: View {
     @ObservedObject var gameState: GameState

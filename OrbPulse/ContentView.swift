@@ -25,10 +25,20 @@ struct ContentView: View {
                 // Safe Area Compliant In-Game HUD
                 VStack {
                     HStack(alignment: .center) {
+                        // 1. Unified Score Header with Dynamic Crown Indicator
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("SCORE")
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .foregroundColor(.cyan.opacity(0.8))
+                            HStack(spacing: 4) {
+                                Text("SCORE")
+                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                    .foregroundColor(gameState.hasBeatenHighScoreThisRun ? .yellow : .cyan.opacity(0.8))
+                                
+                                if gameState.hasBeatenHighScoreThisRun {
+                                    Image(systemName: "crown.fill")
+                                        .font(.system(size: 9))
+                                        .foregroundColor(.yellow)
+                                }
+                            }
+                            
                             Text("\(gameState.score)")
                                 .font(.system(size: 28, weight: .black, design: .rounded))
                                 .foregroundColor(.white)
@@ -36,6 +46,7 @@ struct ContentView: View {
                         
                         Spacer()
                         
+                        // 2. Active Combo Streak Pill
                         if gameState.combo > 1 {
                             HStack(spacing: 4) {
                                 Image(systemName: "flame.fill")
@@ -52,6 +63,7 @@ struct ContentView: View {
                         
                         Spacer()
                         
+                        // 3. Lives & Active Powerup Badges
                         VStack(alignment: .trailing, spacing: 4) {
                             HStack(spacing: 5) {
                                 ForEach(0..<3) { index in
