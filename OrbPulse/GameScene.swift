@@ -297,24 +297,25 @@ final class GameScene: SKScene {
     private func handleCatch(orb: SKShapeNode, identifier: String, isEdge: Bool) {
         switch identifier {
         case OrbType.target.identifier:
-                    gameState?.combo += isEdge ? 2 : 1
-                    let points = isEdge ? 25 : 10
-                    gameState?.addScore(points: points)
-                    
-                    if isEdge {
-                        showFloatingText(text: "PERFECT! +25", color: .cyan, at: orb.position)
-                        shakeScreen(magnitude: 6)
-                        FeedbackManager.shared.playEdgeCatch()
-                    } else {
-                        FeedbackManager.shared.playCatch(combo: gameState?.combo ?? 1)
-                    }
-                    
-                    createBurstEffect(at: orb.position, color: .cyan)
-                    orb.removeFromParent()
-                    
-                    if let combo = gameState?.combo, (combo == 15 || combo == 30) && feverTimeRemaining <= 0 {
-                        startFeverMode()
-                    }
+            gameState?.combo += isEdge ? 2 : 1
+            let points = isEdge ? 25 : 10
+            gameState?.addScore(points: points)
+            
+            if isEdge {
+                showFloatingText(text: "PERFECT! +25", color: .cyan, at: orb.position)
+                shakeScreen(magnitude: 6)
+                FeedbackManager.shared.playEdgeCatch()
+            } else {
+                FeedbackManager.shared.playCatch(combo: gameState?.combo ?? 1)
+            }
+            
+            createBurstEffect(at: orb.position, color: .cyan)
+            orb.removeFromParent()
+            
+            // ⚡️ Infinite Fever Loop: Triggers every 20 combo hits (20x, 40x, 60x, 80x, 100x, 120x...)
+            if let combo = gameState?.combo, combo > 0 && (combo % 20 == 0) && feverTimeRemaining <= 0 {
+                startFeverMode()
+            }
             
         case OrbType.feverGold.identifier:
             gameState?.combo += 1
@@ -359,12 +360,13 @@ final class GameScene: SKScene {
         }
     
     private func endFeverMode() {
-        gameState?.isFeverActive = false
-        if gameState?.activePowerupText == "PULSE RUSH!" {
-            gameState?.activePowerupText = ""
+            gameState?.isFeverActive = false
+            if gameState?.activePowerupText == "PULSE RUSH!" {
+                gameState?.activePowerupText = ""
+            }
+            paddleNode.fillColor = .cyan
+            FeedbackManager.shared.resetFeverStreak()
         }
-        paddleNode.fillColor = .cyan
-    }
     
     private func showFloatingText(text: String, color: UIColor, at position: CGPoint) {
         let label = SKLabelNode(text: text)
