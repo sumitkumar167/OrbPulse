@@ -122,6 +122,16 @@ final class FeedbackManager {
         triggerHaptic(intensity: 1.0, sharpness: 0.9)
     }
     
+    func playNewRecordFanfare() {
+        triggerHaptic(intensity: 1.0, sharpness: 1.0)
+        let recordChord: [Double] = [523.25, 659.25, 783.99, 1046.50, 1318.51]
+        for (index, freq) in recordChord.enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.04) { [weak self] in
+                self?.playCatch(combo: index + 4)
+            }
+        }
+    }
+    
     private func play(buffer: AVAudioPCMBuffer) {
         let player = playerNodes[nodeIndex]
         nodeIndex = (nodeIndex + 1) % nodeCount

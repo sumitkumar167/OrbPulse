@@ -118,6 +118,7 @@ final class GameScene: SKScene {
         gameState?.speedMultiplier = 1.0
         gameState?.isGameOver = false
         gameState?.isFeverActive = false
+        gameState?.hasBeatenHighScoreThisRun = false
         gameState?.activePowerupText = ""
         
         timeElapsed = 0
@@ -295,59 +296,65 @@ final class GameScene: SKScene {
     }
     
     private func handleCatch(orb: SKShapeNode, identifier: String, isEdge: Bool) {
-        switch identifier {
-        case OrbType.target.identifier:
-            gameState?.combo += isEdge ? 2 : 1
-            let points = isEdge ? 25 : 10
-            gameState?.addScore(points: points)
-            
-            if isEdge {
-                showFloatingText(text: "PERFECT! +25", color: .cyan, at: orb.position)
-                shakeScreen(magnitude: 6)
-                FeedbackManager.shared.playEdgeCatch()
-            } else {
-                FeedbackManager.shared.playCatch(combo: gameState?.combo ?? 1)
+            switch identifier {
+            case OrbType.target.identifier:
+                gameState?.combo += isEdge ? 2 : 1
+                let points = isEdge ? 25 : 10
+                let brokeRecord = gameState?.addScore(points: points) ?? false
+                
+                if brokeRecord {
+                    triggerNewRecordCelebration()
+                }
+                
+                if isEdge {
+                    showFloatingText(text: "PERFECT! +25", color: .cyan, at: orb.position)
+                    shakeScreen(magnitude: 6)
+                    FeedbackManager.shared.playEdgeCatch()
+                } else {
+                    FeedbackManager.shared.playCatch(combo: gameState?.combo ?? 1)
+                }
+                
+                createBurstEffect(at: orb.position, color: .cyan)
+                orb.removeFromParent()
+                
+                if let combo = gameState?.combo, combo > 0 && (combo % 20 == 0) && feverTimeRemaining <= 0 {
+                    startFeverMode()
+                }
+                
+            case OrbType.feverGold.identifier:
+                gameState?.combo += 1
+                let brokeRecord = gameState?.addScore(points: 30) ?? false
+                if brokeRecord {
+                    triggerNewRecordCelebration()
+                }
+                FeedbackManager.shared.playGoldCatch()
+                createBurstEffect(at: orb.position, color: .yellow)
+                orb.removeFromParent()
+                
+            case OrbType.wide.identifier:
+                gameState?.activePowerupText = "WIDE"
+                FeedbackManager.shared.playPowerup()
+                createBurstEffect(at: orb.position, color: .green)
+                orb.removeFromParent()
+                triggerWidePaddle()
+                
+            case OrbType.magnet.identifier:
+                gameState?.activePowerupText = "MAGNET"
+                FeedbackManager.shared.playPowerup()
+                createBurstEffect(at: orb.position, color: .yellow)
+                orb.removeFromParent()
+                triggerMagnet()
+                
+            case OrbType.hazard.identifier:
+                FeedbackManager.shared.playHazard()
+                createBurstEffect(at: orb.position, color: .red)
+                orb.removeFromParent()
+                loseLife()
+                
+            default:
+                break
             }
-            
-            createBurstEffect(at: orb.position, color: .cyan)
-            orb.removeFromParent()
-            
-            // ⚡️ Infinite Fever Loop: Triggers every 20 combo hits (20x, 40x, 60x, 80x, 100x, 120x...)
-            if let combo = gameState?.combo, combo > 0 && (combo % 20 == 0) && feverTimeRemaining <= 0 {
-                startFeverMode()
-            }
-            
-        case OrbType.feverGold.identifier:
-            gameState?.combo += 1
-            gameState?.addScore(points: 30)
-            FeedbackManager.shared.playGoldCatch()
-            createBurstEffect(at: orb.position, color: .yellow)
-            orb.removeFromParent()
-            
-        case OrbType.wide.identifier:
-            gameState?.activePowerupText = "WIDE"
-            FeedbackManager.shared.playPowerup()
-            createBurstEffect(at: orb.position, color: .green)
-            orb.removeFromParent()
-            triggerWidePaddle()
-            
-        case OrbType.magnet.identifier:
-            gameState?.activePowerupText = "MAGNET"
-            FeedbackManager.shared.playPowerup()
-            createBurstEffect(at: orb.position, color: .yellow)
-            orb.removeFromParent()
-            triggerMagnet()
-            
-        case OrbType.hazard.identifier:
-            FeedbackManager.shared.playHazard()
-            createBurstEffect(at: orb.position, color: .red)
-            orb.removeFromParent()
-            loseLife()
-            
-        default:
-            break
         }
-    }
     
     private func startFeverMode() {
             feverTimeRemaining = 5.0
@@ -459,6 +466,37 @@ final class GameScene: SKScene {
             let move = SKAction.move(to: destination, duration: 0.18)
             let fade = SKAction.fadeOut(withDuration: 0.18)
             let group = SKAction.group([move, fade])
+            let remove = SKAction.removeFromParent()
+            
+            spark.run(SKAction.sequence([group, remove]))
+        }
+    }
+    
+    private func triggerNewRecordCelebration() {
+        FeedbackManager.shared.playNewRecordFanfare()
+        showFloatingText(text: "👑 NEW RECORD! 👑", color: .yellow, at: CGPoint(x: size.width / 2, y: size.height * 0.55))
+        shakeScreen(magnitude: 12)
+        
+        // Gold Confetti Shower
+        for _ in 0..<30 {
+            let spark = SKShapeNode(rectOf: CGSize(width: 4, height: 8))
+            spark.fillColor = (Bool.random() ? UIColor.yellow : UIColor.cyan)
+            spark.strokeColor = .clear
+            spark.position = CGPoint(x: size.width / 2, y: size.height * 0.55)
+            spark.zPosition = 200
+            addChild(spark)
+            
+            let angle = CGFloat.random(in: 0...(2 * .pi))
+            let distance = CGFloat.random(in: 60...160)
+            let dest = CGPoint(
+                x: spark.position.x + cos(angle) * distance,
+                y: spark.position.y + sin(angle) * distance
+            )
+            
+            let move = SKAction.move(to: dest, duration: 0.4)
+            let rotate = SKAction.rotate(byAngle: CGFloat.random(in: -4...4), duration: 0.4)
+            let fade = SKAction.fadeOut(withDuration: 0.4)
+            let group = SKAction.group([move, rotate, fade])
             let remove = SKAction.removeFromParent()
             
             spark.run(SKAction.sequence([group, remove]))

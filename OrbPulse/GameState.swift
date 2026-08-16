@@ -15,17 +15,28 @@ final class GameState: ObservableObject {
     @Published var activePowerupText: String = ""
     @Published var isFeverActive: Bool = false
     @Published var feverTimer: Double = 0.0
+    @Published var hasBeatenHighScoreThisRun: Bool = false
     
-    func addScore(points: Int) {
+    func addScore(points: Int) -> Bool {
         let multiplier = isFeverActive ? (max(1, combo / 4 + 1) * 2) : max(1, combo / 4 + 1)
         score += points * multiplier
         if combo > maxStreak {
             maxStreak = combo
         }
+        // Detect the exact moment the high score is broken
+        if highScore > 0 && score > highScore && !hasBeatenHighScoreThisRun {
+            hasBeatenHighScoreThisRun = true
+            highScore = score
+            UserDefaults.standard.set(highScore, forKey: "OrbPulse_HighScore")
+            return true
+        }
+        
         if score > highScore {
             highScore = score
             UserDefaults.standard.set(highScore, forKey: "OrbPulse_HighScore")
         }
+        
+        return false
     }
     
     func resetCombo() {
