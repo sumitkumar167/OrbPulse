@@ -6,89 +6,60 @@
 //
 import SwiftUI
 
-// MARK: - Retro Space Background (With Dynamic Pulse Rush Reactive Warp)
+// MARK: - Zero-Stutter Space Background
 struct AnimatedSpaceBackground: View {
     @ObservedObject var gameState: GameState
     
-    @State private var starOffset1: CGFloat = 0
-    @State private var starOffset2: CGFloat = 0
-    @State private var pulseGlow = false
-    
-    var isFever: Bool { gameState.isFeverActive }
+    @State private var starOffset: CGFloat = 0
     
     var body: some View {
         ZStack {
-            // Background shifts from obsidian space to deep fever gold aura
-            Color(isFever ? Color(red: 0.12, green: 0.08, blue: 0.02) : Color(red: 0.03, green: 0.03, blue: 0.06))
-                .animation(.easeInOut(duration: 0.4), value: isFever)
+            // 1. Dark Base
+            Color(red: 0.03, green: 0.03, blue: 0.06)
             
-            // Dynamic Horizon Aura
-            VStack {
-                Spacer()
-                LinearGradient(
-                    colors: [
-                        Color.clear,
-                        isFever ? Color.yellow.opacity(0.35) : Color.cyan.opacity(0.12),
-                        isFever ? Color.orange.opacity(0.45) : Color.purple.opacity(0.2)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: isFever ? 360 : 260)
-            }
-            .animation(.easeInOut(duration: 0.4), value: isFever)
+            // 2. Fever Glow (Pure Alpha Interpolation)
+            RadialGradient(
+                colors: [Color.yellow.opacity(0.35), Color.clear],
+                center: .bottom,
+                startRadius: 20,
+                endRadius: 400
+            )
+            .opacity(gameState.isFeverActive ? 1.0 : 0.0)
+            .animation(.linear(duration: 0.3), value: gameState.isFeverActive)
             
-            // Pulse Rush Gold Energy Beam (Center Horizon)
-            if isFever {
-                Circle()
-                    .fill(RadialGradient(colors: [Color.yellow.opacity(0.4), Color.clear], center: .center, startRadius: 10, endRadius: 280))
-                    .frame(width: 500, height: 500)
-                    .scaleEffect(pulseGlow ? 1.15 : 0.9)
-                    .offset(y: 80)
-                    .transition(.opacity)
-            }
+            // 3. Normal Horizon Glow
+            LinearGradient(
+                colors: [Color.clear, Color.cyan.opacity(0.12), Color.purple.opacity(0.18)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 260)
+            .frame(maxHeight: .infinity, alignment: .bottom)
+            .opacity(gameState.isFeverActive ? 0.0 : 1.0)
+            .animation(.linear(duration: 0.3), value: gameState.isFeverActive)
             
-            // Parallax Star Layers (Accelerate during Pulse Rush)
-            StarfieldCanvas(count: 35, seed: 1, isFever: isFever)
-                .opacity(isFever ? 0.8 : 0.4)
-                .offset(y: starOffset1)
-            
-            StarfieldCanvas(count: 22, seed: 2, isFever: isFever)
-                .opacity(isFever ? 1.0 : 0.75)
-                .offset(y: starOffset2)
+            // 4. Parallax Stars
+            StarCanvas()
+                .offset(y: starOffset)
         }
         .onAppear {
-            withAnimation(.linear(duration: 20).repeatForever(autoreverses: false)) {
-                starOffset1 = 400
-            }
-            withAnimation(.linear(duration: 10).repeatForever(autoreverses: false)) {
-                starOffset2 = 400
-            }
-            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
-                pulseGlow = true
+            withAnimation(.linear(duration: 15).repeatForever(autoreverses: false)) {
+                starOffset = 400
             }
         }
     }
 }
 
-private struct StarfieldCanvas: View {
-    let count: Int
-    let seed: Int
-    let isFever: Bool
-    
+private struct StarCanvas: View {
     var body: some View {
-        GeometryReader { geo in
-            Canvas { ctx, size in
-                for i in 0..<count {
-                    let pseudoRandomX = Double((i * 97 + seed * 31) % 1000) / 1000.0 * size.width
-                    let pseudoRandomY = Double((i * 137 + seed * 53) % 1000) / 1000.0 * (size.height + 400) - 200
-                    let starSize = Double((i % 3) + (isFever ? 2 : 1))
-                    
-                    let rect = CGRect(x: pseudoRandomX, y: pseudoRandomY, width: starSize, height: isFever ? starSize * 3.5 : starSize) // Streaking stars in fever
-                    let color = isFever ? Color.yellow : ((i % 4 == 0) ? Color.cyan.opacity(0.9) : Color.white.opacity(0.8))
-                    
-                    ctx.fill(Path(ellipseIn: rect), with: .color(color))
-                }
+        Canvas { ctx, size in
+            for i in 0..<30 {
+                let px = Double((i * 97) % 1000) / 1000.0 * size.width
+                let py = Double((i * 137) % 1000) / 1000.0 * (size.height + 400) - 200
+                let s = Double((i % 2) + 1)
+                
+                let rect = CGRect(x: px, y: py, width: s, height: s)
+                ctx.fill(Path(ellipseIn: rect), with: .color(Color.white.opacity(0.65)))
             }
         }
     }
