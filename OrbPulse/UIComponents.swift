@@ -218,7 +218,7 @@ struct LandingView: View {
     }
 }
 
-// MARK: - Game Over Modal
+// MARK: - Game Over Modal (With Instant 1-Tap Anywhere Replay)
 struct GameOverModal: View {
     @ObservedObject var gameState: GameState
     var scene: GameScene
@@ -229,7 +229,13 @@ struct GameOverModal: View {
     
     var body: some View {
         ZStack {
-            Color.black.opacity(0.85).ignoresSafeArea()
+            // Tap background to instantly retry
+            Color.black.opacity(0.85)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    triggerQuickRestart()
+                }
             
             VStack(spacing: 24) {
                 VStack(spacing: 6) {
@@ -290,6 +296,7 @@ struct GameOverModal: View {
                         .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.1), lineWidth: 1))
                 )
                 
+                // Action Buttons
                 HStack(spacing: 14) {
                     Button(action: {
                         gameState.lastScore = gameState.score
@@ -309,11 +316,11 @@ struct GameOverModal: View {
                     }
                     
                     Button(action: {
-                        gameState.restartTrigger.toggle()
+                        triggerQuickRestart()
                     }) {
                         HStack(spacing: 6) {
                             Image(systemName: "arrow.counterclockwise")
-                            Text("AGAIN")
+                            Text("TAP TO RETRY")
                         }
                         .font(.system(size: 15, weight: .black, design: .rounded))
                         .foregroundColor(.black)
@@ -322,6 +329,11 @@ struct GameOverModal: View {
                         .background(Capsule().fill(Color.cyan).shadow(color: .cyan.opacity(0.5), radius: 10))
                     }
                 }
+                
+                Text("TAP ANYWHERE TO REPLAY")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.35))
+                    .padding(.top, -6)
             }
             .padding(28)
             .background(
@@ -332,5 +344,9 @@ struct GameOverModal: View {
             )
             .padding(.horizontal, 24)
         }
+    }
+    
+    private func triggerQuickRestart() {
+        gameState.restartTrigger.toggle()
     }
 }
