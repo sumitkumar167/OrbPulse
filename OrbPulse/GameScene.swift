@@ -42,6 +42,9 @@ final class GameScene: SKScene {
     private var dangerLineNode: SKShapeNode!
     private var particleTexture: SKTexture?
     
+    // Pre-configured template emitter for instant zero-lag cloning
+    private var templateEmitter: SKEmitterNode?
+    
     private let defaultPaddleWidth: CGFloat = 110.0
     private var currentPaddleWidth: CGFloat = 110.0
     private let paddleHeight: CGFloat = 18.0
@@ -55,10 +58,12 @@ final class GameScene: SKScene {
         view.allowsTransparency = true
         physicsWorld.gravity = CGVector(dx: 0, dy: 0)
         
-        // Eagerly warm up FeedbackManager & Haptics before gameplay starts
         FeedbackManager.shared.warmUp()
         
         createParticleTexture(in: view)
+        setupTemplateEmitter()
+        preWarmFontAtlas() // ⚡️ Pre-rasterizes CoreText glyphs for zero-frame drop
+        
         setupDangerLine()
         setupPaddle()
     }
@@ -75,6 +80,38 @@ final class GameScene: SKScene {
             }
         }
         particleTexture = SKTexture(image: img)
+    }
+    
+    // Pre-create archetype emitter so runtime spawns only perform lightweight copies
+    private func setupTemplateEmitter() {
+        let emitter = SKEmitterNode()
+        emitter.particleTexture = particleTexture
+        emitter.particleBirthRate = 140
+        emitter.particleLifetime = 0.24
+        emitter.particleLifetimeRange = 0.06
+        emitter.particlePositionRange = CGVector(dx: 26, dy: 4)
+        emitter.particleSpeed = 35
+        emitter.particleSpeedRange = 12
+        emitter.emissionAngle = .pi / 2
+        emitter.emissionAngleRange = .pi / 14
+        emitter.particleScale = 0.85
+        emitter.particleScaleRange = 0.15
+        emitter.particleScaleSpeed = -2.6
+        emitter.particleAlpha = 0.8
+        emitter.particleAlphaSpeed = -3.2
+        emitter.particleBlendMode = .add
+        emitter.particleColorBlendFactor = 1.0
+        templateEmitter = emitter
+    }
+    
+    // Pre-loads AvenirNext font textures into SpriteKit's GPU cache
+    private func preWarmFontAtlas() {
+        let dummyLabel = SKLabelNode(text: "⚡️ PULSE RUSH ⚡️ PERFECT! +25 👑 NEW RECORD! 👑")
+        dummyLabel.fontName = "AvenirNext-Heavy"
+        dummyLabel.fontSize = 15
+        dummyLabel.alpha = 0.001
+        dummyLabel.position = CGPoint(x: -500, y: -500)
+        addChild(dummyLabel)
     }
     
     private func setupDangerLine() {
@@ -107,7 +144,9 @@ final class GameScene: SKScene {
         paddleNode?.isHidden = true
         dangerLineNode?.isHidden = true
         for child in children where child !== paddleNode && child !== dangerLineNode {
-            child.removeFromParent()
+            if child.alpha > 0.01 { // Keep dummy warming nodes
+                child.removeFromParent()
+            }
         }
     }
     
@@ -176,7 +215,6 @@ final class GameScene: SKScene {
         let currentMultiplier = 1.0 + (timeElapsed / 28.0)
         gameState.speedMultiplier = currentMultiplier
         
-        // Handle Fever / Pulse Rush Timer
         if feverTimeRemaining > 0 {
             feverTimeRemaining -= 1.0 / 60.0
             gameState.feverTimer = feverTimeRemaining
@@ -199,7 +237,7 @@ final class GameScene: SKScene {
         checkPaddleCollisions()
         
         for child in children {
-            if child.position.y < (paddleYPosition - 35) && child !== paddleNode && child !== dangerLineNode && child.name != "floatingText" {
+            if child.position.y < (paddleYPosition - 35) && child !== paddleNode && child !== dangerLineNode && child.name != "floatingText" && child.alpha > 0.01 {
                 if child.name == OrbType.target.identifier && feverTimeRemaining <= 0 {
                     loseLife()
                 }
@@ -239,7 +277,9 @@ final class GameScene: SKScene {
         orb.lineWidth = 2.0
         orb.zPosition = 10
         
-        if let emitter = createTrailEmitter(color: orbType.color) {
+        // Fast template cloning
+        if let template = templateEmitter, let emitter = template.copy() as? SKEmitterNode {
+            emitter.particleColor = orbType.color
             emitter.targetNode = self
             emitter.zPosition = -1
             orb.addChild(emitter)
@@ -251,132 +291,104 @@ final class GameScene: SKScene {
         orb.run(moveDown)
     }
     
-    private func createTrailEmitter(color: UIColor) -> SKEmitterNode? {
-        let emitter = SKEmitterNode()
-        emitter.particleTexture = particleTexture
-        emitter.particleBirthRate = 140
-        emitter.particleLifetime = 0.24
-        emitter.particleLifetimeRange = 0.06
-        emitter.particlePositionRange = CGVector(dx: 26, dy: 4)
-        
-        emitter.particleSpeed = 35
-        emitter.particleSpeedRange = 12
-        emitter.emissionAngle = .pi / 2
-        emitter.emissionAngleRange = .pi / 14
-        
-        emitter.particleScale = 0.85
-        emitter.particleScaleRange = 0.15
-        emitter.particleScaleSpeed = -2.6
-        emitter.particleAlpha = 0.8
-        emitter.particleAlphaSpeed = -3.2
-        emitter.particleBlendMode = .add
-        emitter.particleColor = color
-        emitter.particleColorBlendFactor = 1.0
-        
-        return emitter
-    }
-    
     private func checkPaddleCollisions() {
         let paddleFrame = paddleNode.frame.insetBy(dx: -4, dy: -4)
         
-        for child in children where child !== paddleNode && child !== dangerLineNode && child.name != "floatingText" {
+        for child in children where child !== paddleNode && child !== dangerLineNode && child.name != "floatingText" && child.alpha > 0.01 {
             guard let orb = child as? SKShapeNode, let name = orb.name else { continue }
             
-            // Magnet pull
             if (isMagnetActive || feverTimeRemaining > 0) && (name == OrbType.target.identifier || name == OrbType.feverGold.identifier) && orb.position.y < size.height * 0.65 {
                 let dx = paddleNode.position.x - orb.position.x
                 orb.position.x += dx * 0.10
             }
             
             if paddleFrame.contains(orb.position) || paddleFrame.intersects(orb.frame) {
-                // Determine if it was an edge catch (outer 18% of paddle)
                 let distanceFromCenter = abs(orb.position.x - paddleNode.position.x)
                 let isEdgeDeflection = distanceFromCenter > (currentPaddleWidth * 0.36)
-                
                 handleCatch(orb: orb, identifier: name, isEdge: isEdgeDeflection)
             }
         }
     }
     
     private func handleCatch(orb: SKShapeNode, identifier: String, isEdge: Bool) {
-            switch identifier {
-            case OrbType.target.identifier:
-                gameState?.combo += isEdge ? 2 : 1
-                let points = isEdge ? 25 : 10
-                let brokeRecord = gameState?.addScore(points: points) ?? false
-                
-                if brokeRecord {
-                    triggerNewRecordCelebration()
-                }
-                
-                if isEdge {
-                    showFloatingText(text: "PERFECT! +25", color: .cyan, at: orb.position)
-                    shakeScreen(magnitude: 6)
-                    FeedbackManager.shared.playEdgeCatch()
-                } else {
-                    FeedbackManager.shared.playCatch(combo: gameState?.combo ?? 1)
-                }
-                
-                createBurstEffect(at: orb.position, color: .cyan)
-                orb.removeFromParent()
-                
-                if let combo = gameState?.combo, combo > 0 && (combo % 20 == 0) && feverTimeRemaining <= 0 {
-                    startFeverMode()
-                }
-                
-            case OrbType.feverGold.identifier:
-                gameState?.combo += 1
-                let brokeRecord = gameState?.addScore(points: 30) ?? false
-                if brokeRecord {
-                    triggerNewRecordCelebration()
-                }
-                FeedbackManager.shared.playGoldCatch()
-                createBurstEffect(at: orb.position, color: .yellow)
-                orb.removeFromParent()
-                
-            case OrbType.wide.identifier:
-                gameState?.activePowerupText = "WIDE"
-                FeedbackManager.shared.playPowerup()
-                createBurstEffect(at: orb.position, color: .green)
-                orb.removeFromParent()
-                triggerWidePaddle()
-                
-            case OrbType.magnet.identifier:
-                gameState?.activePowerupText = "MAGNET"
-                FeedbackManager.shared.playPowerup()
-                createBurstEffect(at: orb.position, color: .yellow)
-                orb.removeFromParent()
-                triggerMagnet()
-                
-            case OrbType.hazard.identifier:
-                FeedbackManager.shared.playHazard()
-                createBurstEffect(at: orb.position, color: .red)
-                orb.removeFromParent()
-                loseLife()
-                
-            default:
-                break
+        switch identifier {
+        case OrbType.target.identifier:
+            gameState?.combo += isEdge ? 2 : 1
+            let points = isEdge ? 25 : 10
+            let brokeRecord = gameState?.addScore(points: points) ?? false
+            
+            if brokeRecord {
+                triggerNewRecordCelebration()
             }
+            
+            if isEdge {
+                showFloatingText(text: "PERFECT! +25", color: .cyan, at: orb.position)
+                shakeScreen(magnitude: 6)
+                FeedbackManager.shared.playEdgeCatch()
+            } else {
+                FeedbackManager.shared.playCatch(combo: gameState?.combo ?? 1)
+            }
+            
+            createBurstEffect(at: orb.position, color: .cyan)
+            orb.removeFromParent()
+            
+            if let combo = gameState?.combo, combo > 0 && (combo % 20 == 0) && feverTimeRemaining <= 0 {
+                startFeverMode()
+            }
+            
+        case OrbType.feverGold.identifier:
+            gameState?.combo += 1
+            let brokeRecord = gameState?.addScore(points: 30) ?? false
+            if brokeRecord {
+                triggerNewRecordCelebration()
+            }
+            FeedbackManager.shared.playGoldCatch()
+            createBurstEffect(at: orb.position, color: .yellow)
+            orb.removeFromParent()
+            
+        case OrbType.wide.identifier:
+            gameState?.activePowerupText = "WIDE"
+            FeedbackManager.shared.playPowerup()
+            createBurstEffect(at: orb.position, color: .green)
+            orb.removeFromParent()
+            triggerWidePaddle()
+            
+        case OrbType.magnet.identifier:
+            gameState?.activePowerupText = "MAGNET"
+            FeedbackManager.shared.playPowerup()
+            createBurstEffect(at: orb.position, color: .yellow)
+            orb.removeFromParent()
+            triggerMagnet()
+            
+        case OrbType.hazard.identifier:
+            FeedbackManager.shared.playHazard()
+            createBurstEffect(at: orb.position, color: .red)
+            orb.removeFromParent()
+            loseLife()
+            
+        default:
+            break
         }
+    }
     
     private func startFeverMode() {
-            feverTimeRemaining = 5.0
-            gameState?.isFeverActive = true
-            gameState?.activePowerupText = "PULSE RUSH!"
-            paddleNode.fillColor = UIColor(red: 1.0, green: 0.84, blue: 0.0, alpha: 1.0)
-            showFloatingText(text: "⚡️ PULSE RUSH ⚡️", color: .yellow, at: CGPoint(x: size.width / 2, y: size.height / 2))
-            shakeScreen(magnitude: 14)
-            FeedbackManager.shared.playPulseRushFanfare()
-        }
+        feverTimeRemaining = 5.0
+        gameState?.isFeverActive = true
+        gameState?.activePowerupText = "PULSE RUSH!"
+        paddleNode.fillColor = UIColor(red: 1.0, green: 0.84, blue: 0.0, alpha: 1.0)
+        showFloatingText(text: "⚡️ PULSE RUSH ⚡️", color: .yellow, at: CGPoint(x: size.width / 2, y: size.height / 2))
+        shakeScreen(magnitude: 10)
+        FeedbackManager.shared.playPulseRushFanfare()
+    }
     
     private func endFeverMode() {
-            gameState?.isFeverActive = false
-            if gameState?.activePowerupText == "PULSE RUSH!" {
-                gameState?.activePowerupText = ""
-            }
-            paddleNode.fillColor = .cyan
-            FeedbackManager.shared.resetFeverStreak()
+        gameState?.isFeverActive = false
+        if gameState?.activePowerupText == "PULSE RUSH!" {
+            gameState?.activePowerupText = ""
         }
+        paddleNode.fillColor = .cyan
+        FeedbackManager.shared.resetFeverStreak()
+    }
     
     private func showFloatingText(text: String, color: UIColor, at position: CGPoint) {
         let label = SKLabelNode(text: text)
@@ -393,6 +405,35 @@ final class GameScene: SKScene {
         let group = SKAction.group([moveUp, fadeOut])
         let remove = SKAction.removeFromParent()
         label.run(SKAction.sequence([group, remove]))
+    }
+    
+    private func triggerNewRecordCelebration() {
+        FeedbackManager.shared.playNewRecordFanfare()
+        showFloatingText(text: "👑 NEW RECORD! 👑", color: .yellow, at: CGPoint(x: size.width / 2, y: size.height * 0.55))
+        shakeScreen(magnitude: 10)
+        
+        for _ in 0..<24 {
+            let spark = SKShapeNode(rectOf: CGSize(width: 4, height: 8))
+            spark.fillColor = (Bool.random() ? UIColor.yellow : UIColor.cyan)
+            spark.strokeColor = .clear
+            spark.position = CGPoint(x: size.width / 2, y: size.height * 0.55)
+            spark.zPosition = 200
+            addChild(spark)
+            
+            let angle = CGFloat.random(in: 0...(2 * .pi))
+            let distance = CGFloat.random(in: 60...140)
+            let dest = CGPoint(
+                x: spark.position.x + cos(angle) * distance,
+                y: spark.position.y + sin(angle) * distance
+            )
+            
+            let move = SKAction.move(to: dest, duration: 0.4)
+            let rotate = SKAction.rotate(byAngle: CGFloat.random(in: -4...4), duration: 0.4)
+            let fade = SKAction.fadeOut(withDuration: 0.4)
+            let group = SKAction.group([move, rotate, fade])
+            let remove = SKAction.removeFromParent()
+            spark.run(SKAction.sequence([group, remove]))
+        }
     }
     
     private func triggerWidePaddle() {
@@ -469,37 +510,6 @@ final class GameScene: SKScene {
             let move = SKAction.move(to: destination, duration: 0.18)
             let fade = SKAction.fadeOut(withDuration: 0.18)
             let group = SKAction.group([move, fade])
-            let remove = SKAction.removeFromParent()
-            
-            spark.run(SKAction.sequence([group, remove]))
-        }
-    }
-    
-    private func triggerNewRecordCelebration() {
-        FeedbackManager.shared.playNewRecordFanfare()
-        showFloatingText(text: "👑 NEW RECORD! 👑", color: .yellow, at: CGPoint(x: size.width / 2, y: size.height * 0.55))
-        shakeScreen(magnitude: 12)
-        
-        // Gold Confetti Shower
-        for _ in 0..<30 {
-            let spark = SKShapeNode(rectOf: CGSize(width: 4, height: 8))
-            spark.fillColor = (Bool.random() ? UIColor.yellow : UIColor.cyan)
-            spark.strokeColor = .clear
-            spark.position = CGPoint(x: size.width / 2, y: size.height * 0.55)
-            spark.zPosition = 200
-            addChild(spark)
-            
-            let angle = CGFloat.random(in: 0...(2 * .pi))
-            let distance = CGFloat.random(in: 60...160)
-            let dest = CGPoint(
-                x: spark.position.x + cos(angle) * distance,
-                y: spark.position.y + sin(angle) * distance
-            )
-            
-            let move = SKAction.move(to: dest, duration: 0.4)
-            let rotate = SKAction.rotate(byAngle: CGFloat.random(in: -4...4), duration: 0.4)
-            let fade = SKAction.fadeOut(withDuration: 0.4)
-            let group = SKAction.group([move, rotate, fade])
             let remove = SKAction.removeFromParent()
             
             spark.run(SKAction.sequence([group, remove]))
