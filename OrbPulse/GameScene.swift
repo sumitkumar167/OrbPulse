@@ -129,7 +129,7 @@ final class GameScene: SKScene {
         currentPaddleWidth = defaultPaddleWidth
         
         paddleNode = SKShapeNode(rectOf: CGSize(width: currentPaddleWidth, height: paddleHeight), cornerRadius: 9)
-        paddleNode.fillColor = .cyan
+        paddleNode.fillColor = gameState?.selectedSkin.uiColor ?? .cyan
         paddleNode.strokeColor = .white
         paddleNode.lineWidth = 2.5
         paddleNode.position = CGPoint(x: size.width / 2, y: paddleYPosition)
@@ -172,7 +172,7 @@ final class GameScene: SKScene {
         
         updatePaddleWidth(to: defaultPaddleWidth)
         paddleNode.position.x = size.width / 2
-        paddleNode.fillColor = .cyan
+        paddleNode.fillColor = gameState?.selectedSkin.uiColor ?? .cyan
         paddleNode.isHidden = false
         dangerLineNode?.isHidden = false
         isPlaying = true
@@ -386,7 +386,7 @@ final class GameScene: SKScene {
         if gameState?.activePowerupText == "PULSE RUSH!" {
             gameState?.activePowerupText = ""
         }
-        paddleNode.fillColor = .cyan
+        paddleNode.fillColor = gameState?.selectedSkin.uiColor ?? .cyan
         FeedbackManager.shared.resetFeverStreak()
     }
     
@@ -443,7 +443,7 @@ final class GameScene: SKScene {
         DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) { [weak self] in
             guard let self = self else { return }
             self.updatePaddleWidth(to: self.defaultPaddleWidth)
-            self.paddleNode.fillColor = (self.feverTimeRemaining > 0) ? .yellow : .cyan
+            self.paddleNode.fillColor = (self.feverTimeRemaining > 0) ? .yellow : (self.gameState?.selectedSkin.uiColor ?? .cyan)
             if self.gameState?.activePowerupText == "WIDE" {
                 self.gameState?.activePowerupText = ""
             }
