@@ -297,24 +297,24 @@ final class GameScene: SKScene {
     private func handleCatch(orb: SKShapeNode, identifier: String, isEdge: Bool) {
         switch identifier {
         case OrbType.target.identifier:
-            gameState?.combo += isEdge ? 2 : 1
-            let points = isEdge ? 25 : 10
-            gameState?.addScore(points: points)
-            
-            if isEdge {
-                showFloatingText(text: "PERFECT! +25", color: .cyan, at: orb.position)
-                shakeScreen(magnitude: 6)
-            }
-            
-            let pitch = min(2.0, 1.0 + Double(gameState?.combo ?? 0) * 0.05)
-            FeedbackManager.shared.playCatch(pitchShift: pitch)
-            createBurstEffect(at: orb.position, color: .cyan)
-            orb.removeFromParent()
-            
-            // Trigger Pulse Rush at 15x or 30x combo
-            if let combo = gameState?.combo, (combo == 15 || combo == 30) && feverTimeRemaining <= 0 {
-                startFeverMode()
-            }
+                    gameState?.combo += isEdge ? 2 : 1
+                    let points = isEdge ? 25 : 10
+                    gameState?.addScore(points: points)
+                    
+                    if isEdge {
+                        showFloatingText(text: "PERFECT! +25", color: .cyan, at: orb.position)
+                        shakeScreen(magnitude: 6)
+                        FeedbackManager.shared.playEdgeCatch()
+                    } else {
+                        FeedbackManager.shared.playCatch(combo: gameState?.combo ?? 1)
+                    }
+                    
+                    createBurstEffect(at: orb.position, color: .cyan)
+                    orb.removeFromParent()
+                    
+                    if let combo = gameState?.combo, (combo == 15 || combo == 30) && feverTimeRemaining <= 0 {
+                        startFeverMode()
+                    }
             
         case OrbType.feverGold.identifier:
             gameState?.combo += 1
@@ -349,13 +349,14 @@ final class GameScene: SKScene {
     }
     
     private func startFeverMode() {
-        feverTimeRemaining = 5.0
-        gameState?.isFeverActive = true
-        gameState?.activePowerupText = "PULSE RUSH!"
-        paddleNode.fillColor = UIColor(red: 1.0, green: 0.84, blue: 0.0, alpha: 1.0)
-        showFloatingText(text: "⚡️ PULSE RUSH ⚡️", color: .yellow, at: CGPoint(x: size.width / 2, y: size.height / 2))
-        shakeScreen(magnitude: 14)
-    }
+            feverTimeRemaining = 5.0
+            gameState?.isFeverActive = true
+            gameState?.activePowerupText = "PULSE RUSH!"
+            paddleNode.fillColor = UIColor(red: 1.0, green: 0.84, blue: 0.0, alpha: 1.0)
+            showFloatingText(text: "⚡️ PULSE RUSH ⚡️", color: .yellow, at: CGPoint(x: size.width / 2, y: size.height / 2))
+            shakeScreen(magnitude: 14)
+            FeedbackManager.shared.playPulseRushFanfare()
+        }
     
     private func endFeverMode() {
         gameState?.isFeverActive = false
