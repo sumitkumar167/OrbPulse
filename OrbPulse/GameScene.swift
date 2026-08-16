@@ -55,6 +55,9 @@ final class GameScene: SKScene {
         view.allowsTransparency = true
         physicsWorld.gravity = CGVector(dx: 0, dy: 0)
         
+        // Eagerly warm up FeedbackManager & Haptics before gameplay starts
+        FeedbackManager.shared.warmUp()
+        
         createParticleTexture(in: view)
         setupDangerLine()
         setupPaddle()
