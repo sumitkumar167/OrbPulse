@@ -6,56 +6,52 @@
 //
 import SwiftUI
 
-// MARK: - Zero-Stutter Space Background (With Subtle Record-Breaker Horizon)
+// MARK: - Zero-Stutter Space Background (With Dynamic Rising Game-Over Horizon)
 struct AnimatedSpaceBackground: View {
     @ObservedObject var gameState: GameState
     @State private var starOffset: CGFloat = 0
     
     var isFever: Bool { gameState.isFeverActive }
     var isRecordRun: Bool { gameState.hasBeatenHighScoreThisRun }
+    var isGameOver: Bool { gameState.isGameOver }
+    var skinColor: Color { gameState.selectedSkin.primaryColor }
     
     var body: some View {
-        ZStack {
-            Color(red: 0.03, green: 0.03, blue: 0.06)
-            
-            RadialGradient(
-                colors: [
-                    Color(red: 1.0, green: 0.82, blue: 0.28).opacity(isRecordRun ? 0.15 : 0.0),
-                    Color.clear
-                ],
-                center: .bottom,
-                startRadius: 10,
-                endRadius: 450
-            )
-            .animation(.easeInOut(duration: 1.2), value: isRecordRun)
-            
-            RadialGradient(
-                colors: [Color.yellow.opacity(0.35), Color.clear],
-                center: .bottom,
-                startRadius: 20,
-                endRadius: 400
-            )
-            .opacity(isFever ? 1.0 : 0.0)
-            .animation(.linear(duration: 0.3), value: isFever)
-            
-            LinearGradient(
-                colors: [
-                    Color.clear,
-                    isRecordRun ? Color.yellow.opacity(0.12) : Color.cyan.opacity(0.12),
-                    isRecordRun ? Color(red: 0.85, green: 0.45, blue: 0.15).opacity(0.18) : Color.purple.opacity(0.18)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 260)
-            .frame(maxHeight: .infinity, alignment: .bottom)
-            .opacity(isFever ? 0.0 : 1.0)
-            .animation(.easeInOut(duration: 0.8), value: isRecordRun)
-            .animation(.linear(duration: 0.3), value: isFever)
-            
-            StarCanvas(isRecordRun: isRecordRun)
-                .offset(y: starOffset)
-                .animation(.easeInOut(duration: 1.0), value: isRecordRun)
+        GeometryReader { proxy in
+            ZStack(alignment: .bottom) {
+                // Base Cosmic Void
+                Color(red: 0.03, green: 0.03, blue: 0.06)
+                    .ignoresSafeArea()
+                
+                // Starfield Layer
+                StarCanvas(isRecordRun: isRecordRun)
+                    .offset(y: starOffset)
+                
+                // Pulse Rush Radiant Flare
+                RadialGradient(
+                    colors: [Color.yellow.opacity(0.4), Color.clear],
+                    center: .bottom,
+                    startRadius: 20,
+                    endRadius: 400
+                )
+                .opacity(isFever ? 1.0 : 0.0)
+                .animation(.linear(duration: 0.3), value: isFever)
+                
+                // ⚡️ Expanding Horizon Glow
+                // Resting at bottom (260pt) -> Expands to full screen height on Game Over
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        isGameOver ? skinColor.opacity(0.35) : skinColor.opacity(0.12),
+                        isGameOver ? Color.purple.opacity(0.55) : Color.purple.opacity(0.20)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: isGameOver ? proxy.size.height + proxy.safeAreaInsets.top + proxy.safeAreaInsets.bottom : 260)
+                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: isGameOver)
+                .ignoresSafeArea()
+            }
         }
         .onAppear {
             withAnimation(.linear(duration: 15).repeatForever(autoreverses: false)) {
@@ -527,122 +523,122 @@ struct PaddleLockerModal: View {
     }
 }
 
-// MARK: - Game Over Modal (With Next Skin Unlock Progress Bar)
+// MARK: - Game Over Modal (Clean, Cohesive Cyberpunk Summary)
 struct GameOverModal: View {
     @ObservedObject var gameState: GameState
     var scene: GameScene
+    
+    @State private var glowPulse = false
     
     var isNewHigh: Bool {
         gameState.score >= gameState.highScore && gameState.score > 0
     }
     
-    var nextLockedSkin: PaddleSkin? {
-        PaddleSkin.allCases.first { !gameState.unlockedSkins.contains($0.rawValue) }
+    var skinColor: Color {
+        gameState.selectedSkin.primaryColor
     }
     
     var body: some View {
         ZStack {
-            Color.black.opacity(0.85)
-                .ignoresSafeArea()
+            // Transparent tap area to capture background replay taps
+            Color.clear
                 .contentShape(Rectangle())
+                .ignoresSafeArea()
                 .onTapGesture {
-                    gameState.restartTrigger.toggle()
+                    triggerReplay()
                 }
             
-            VStack(spacing: 20) {
-                VStack(spacing: 6) {
-                    Text("GAME OVER")
-                        .font(.system(size: 32, weight: .black, design: .rounded))
-                        .foregroundColor(.white)
-                    
+            // Focused Arcade Card
+            VStack(spacing: 16) {
+                // Header Status
+                VStack(spacing: 4) {
                     if isNewHigh {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 4) {
                             Image(systemName: "crown.fill")
-                            Text("NEW HIGH SCORE")
+                                .font(.system(size: 11))
+                            Text("NEW RECORD")
+                                .font(.system(size: 10, weight: .black, design: .monospaced))
+                                .tracking(1.5)
                         }
-                        .font(.system(size: 11, weight: .black, design: .monospaced))
                         .foregroundColor(.yellow)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(Color.yellow.opacity(0.2)))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(Color.yellow.opacity(0.18)))
                     }
+                    
+                    Text(isNewHigh ? "RECORD BREAKER" : "ROUND OVER")
+                        .font(.system(size: 24, weight: .black, design: .rounded))
+                        .foregroundColor(.white)
+                        .shadow(color: (isNewHigh ? Color.yellow : skinColor).opacity(0.8), radius: 10)
                 }
+                .padding(.top, 4)
                 
-                // Score Box
-                VStack(spacing: 14) {
-                    VStack(spacing: 2) {
-                        Text("FINAL SCORE")
-                            .font(.system(size: 11, weight: .bold, design: .monospaced))
-                            .foregroundColor(.gray)
-                        Text("\(gameState.score)")
-                            .font(.system(size: 48, weight: .black, design: .rounded))
-                            .foregroundColor(gameState.selectedSkin.primaryColor)
-                            .shadow(color: gameState.selectedSkin.primaryColor.opacity(0.5), radius: 12)
-                    }
+                // Score Display
+                VStack(spacing: 2) {
+                    Text("FINAL SCORE")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .tracking(2)
+                        .foregroundColor(.white.opacity(0.6))
                     
-                    Divider().background(Color.white.opacity(0.1))
-                    
-                    HStack(spacing: 28) {
-                        VStack(spacing: 2) {
-                            Text("BEST")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(.gray)
-                            Text("\(gameState.highScore)")
-                                .font(.system(size: 17, weight: .heavy, design: .rounded))
-                                .foregroundColor(.white)
-                        }
-                        
-                        VStack(spacing: 2) {
-                            Text("TOTAL STARDUST")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(.gray)
-                            HStack(spacing: 4) {
-                                Image(systemName: "sparkles")
-                                    .font(.caption2)
-                                Text("\(gameState.stardust)")
-                                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                            }
-                            .foregroundColor(.yellow)
-                        }
-                    }
+                    Text("\(gameState.score)")
+                        .font(.system(size: 42, weight: .black, design: .rounded))
+                        .foregroundColor(.white)
+                        .shadow(color: skinColor, radius: 12)
                 }
-                .padding(20)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
                 .background(
-                    RoundedRectangle(cornerRadius: 22)
-                        .fill(Color.white.opacity(0.05))
-                        .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.white.opacity(0.04))
                 )
                 
-                // ⚡️ Psychological Hook: Skin Unlock Progress Bar
-                if let next = nextLockedSkin {
-                    let progress = min(1.0, Double(gameState.stardust) / Double(next.cost))
-                    VStack(spacing: 6) {
-                        HStack {
-                            Text("UNLOCK \(next.rawValue.uppercased())")
-                                .font(.system(size: 10, weight: .heavy, design: .monospaced))
-                                .foregroundColor(next.primaryColor)
-                            Spacer()
-                            Text("✦ \(gameState.stardust)/\(next.cost)")
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .foregroundColor(.gray)
+                // Telemetry Badges
+                HStack(spacing: 10) {
+                    // Personal Best
+                    VStack(spacing: 2) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "trophy.fill")
+                                .font(.system(size: 8))
+                                .foregroundColor(.yellow)
+                            Text("BEST")
+                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.5))
                         }
-                        
-                        GeometryReader { g in
-                            ZStack(alignment: .leading) {
-                                Capsule().fill(Color.white.opacity(0.1))
-                                Capsule()
-                                    .fill(next.primaryColor)
-                                    .frame(width: g.size.width * CGFloat(progress))
-                            }
-                        }
-                        .frame(height: 6)
+                        Text("\(gameState.highScore)")
+                            .font(.system(size: 15, weight: .heavy, design: .rounded))
+                            .foregroundColor(.white)
                     }
-                    .padding(14)
-                    .background(RoundedRectangle(cornerRadius: 16).fill(Color.white.opacity(0.04)))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.white.opacity(0.04))
+                    )
+                    
+                    // Total Stardust
+                    VStack(spacing: 2) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 8))
+                                .foregroundColor(.yellow)
+                            Text("STARDUST")
+                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+                        Text("\(gameState.stardust)")
+                            .font(.system(size: 15, weight: .heavy, design: .rounded))
+                            .foregroundColor(.yellow)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.white.opacity(0.04))
+                    )
                 }
                 
-                // Action Buttons
-                HStack(spacing: 12) {
+                // Action Controls
+                HStack(spacing: 10) {
                     Button(action: {
                         gameState.lastScore = gameState.score
                         gameState.isGameOver = false
@@ -654,40 +650,61 @@ struct GameOverModal: View {
                             Text("MENU")
                         }
                         .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(.white.opacity(0.85))
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(Color.white.opacity(0.12)))
+                        .padding(.vertical, 13)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(Color.white.opacity(0.08))
+                        )
                     }
                     
                     Button(action: {
-                        gameState.restartTrigger.toggle()
+                        triggerReplay()
                     }) {
                         HStack(spacing: 6) {
                             Image(systemName: "arrow.counterclockwise")
-                            Text("RETRY")
+                            Text("PLAY AGAIN")
                         }
                         .font(.system(size: 14, weight: .black, design: .rounded))
                         .foregroundColor(.black)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(Capsule().fill(gameState.selectedSkin.primaryColor).shadow(color: gameState.selectedSkin.primaryColor.opacity(0.5), radius: 10))
+                        .padding(.vertical, 13)
+                        .background(
+                            Capsule()
+                                .fill(skinColor)
+                                .shadow(color: skinColor.opacity(glowPulse ? 0.9 : 0.4), radius: glowPulse ? 12 : 6)
+                        )
                     }
                 }
+                .padding(.top, 4)
                 
                 Text("TAP ANYWHERE TO REPLAY")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
                     .foregroundColor(.white.opacity(0.35))
-                    .padding(.top, -4)
+                    .padding(.bottom, 2)
             }
-            .padding(24)
+            .padding(18)
             .background(
-                RoundedRectangle(cornerRadius: 28)
-                    .fill(Color(red: 0.08, green: 0.07, blue: 0.14))
-                    .overlay(RoundedRectangle(cornerRadius: 28).stroke(Color.white.opacity(0.12), lineWidth: 1))
-                    .shadow(color: .black.opacity(0.6), radius: 30)
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(Color(red: 0.08, green: 0.08, blue: 0.14).opacity(0.92))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 24)
+                            .stroke(skinColor.opacity(0.5), lineWidth: 1.5)
+                    )
+                    .shadow(color: .black.opacity(0.5), radius: 24)
             )
-            .padding(.horizontal, 22)
+            .padding(.horizontal, 28)
         }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
+                glowPulse = true
+            }
+        }
+    }
+    
+    private func triggerReplay() {
+        gameState.isGameOver = false
+        gameState.restartTrigger = true
     }
 }

@@ -12,10 +12,15 @@ struct ContentView: View {
     
     var body: some View {
         ZStack {
+            // Layer 1: Ambient Space Background (Always present)
             AnimatedSpaceBackground(gameState: gameState)
                 .ignoresSafeArea()
             
-            if !gameState.isInMenu {
+            // Layer 2: Main Menu vs Active SpriteKit Gameplay
+            if gameState.isInMenu {
+                LandingView(gameState: gameState)
+                    .transition(.opacity)
+            } else {
                 SpriteView(scene: scene, options: [.allowsTransparency])
                     .ignoresSafeArea()
                     .onAppear {
@@ -23,20 +28,22 @@ struct ContentView: View {
                         FeedbackManager.shared.warmUp()
                     }
                 
-                // Isolated HUD subview prevents SpriteView recreation lag
-                GameHUDView(gameState: gameState)
-            } else {
-                LandingView(gameState: gameState)
-                    .transition(.opacity)
+                // In-game HUD (visible only during active play)
+                if !gameState.isGameOver {
+                    GameHUDView(gameState: gameState)
+                        .transition(.opacity)
+                }
             }
             
+            // Layer 3: Game Over Modal (Always mounts on top when triggered)
             if gameState.isGameOver {
                 GameOverModal(gameState: gameState, scene: scene)
-                    .transition(.opacity.combined(with: .scale(scale: 0.92)))
+                    .zIndex(999)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
         }
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: gameState.isGameOver)
         .animation(.easeInOut(duration: 0.25), value: gameState.isInMenu)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: gameState.isGameOver)
     }
 }
 
