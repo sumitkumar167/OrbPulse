@@ -39,10 +39,9 @@ final class GameScene: SKScene {
     private var fallDuration: Double = 3.2
     
     private var paddleNode: SKShapeNode!
+    private var paddleAuraNode: SKShapeNode! // ⚡️ Dedicated aura glow node
     private var dangerLineNode: SKShapeNode!
     private var particleTexture: SKTexture?
-    
-    // Pre-configured template emitter for instant zero-lag cloning
     private var templateEmitter: SKEmitterNode?
     
     private let defaultPaddleWidth: CGFloat = 110.0
@@ -51,6 +50,7 @@ final class GameScene: SKScene {
     private let paddleYPosition: CGFloat = 120.0
     
     private var isMagnetActive = false
+    private var isWideActive = false
     private var feverTimeRemaining: Double = 0.0
     
     override func didMove(to view: SKView) {
@@ -62,7 +62,7 @@ final class GameScene: SKScene {
         
         createParticleTexture(in: view)
         setupTemplateEmitter()
-        preWarmFontAtlas() // ⚡️ Pre-rasterizes CoreText glyphs for zero-frame drop
+        preWarmFontAtlas()
         
         setupDangerLine()
         setupPaddle()
@@ -82,7 +82,6 @@ final class GameScene: SKScene {
         particleTexture = SKTexture(image: img)
     }
     
-    // Pre-create archetype emitter so runtime spawns only perform lightweight copies
     private func setupTemplateEmitter() {
         let emitter = SKEmitterNode()
         emitter.particleTexture = particleTexture
@@ -104,7 +103,6 @@ final class GameScene: SKScene {
         templateEmitter = emitter
     }
     
-    // Pre-loads AvenirNext font textures into SpriteKit's GPU cache
     private func preWarmFontAtlas() {
         let dummyLabel = SKLabelNode(text: "⚡️ PULSE RUSH ⚡️ PERFECT! +25 👑 NEW RECORD! 👑")
         dummyLabel.fontName = "AvenirNext-Heavy"
@@ -126,8 +124,19 @@ final class GameScene: SKScene {
     
     private func setupPaddle() {
         paddleNode?.removeFromParent()
+        paddleAuraNode?.removeFromParent()
         currentPaddleWidth = defaultPaddleWidth
         
+        // Outer Dynamic Glow Aura
+        paddleAuraNode = SKShapeNode(rectOf: CGSize(width: currentPaddleWidth + 14, height: paddleHeight + 14), cornerRadius: 16)
+        paddleAuraNode.fillColor = .clear
+        paddleAuraNode.strokeColor = .clear
+        paddleAuraNode.lineWidth = 4.0
+        paddleAuraNode.zPosition = 99
+        paddleAuraNode.isHidden = true
+        addChild(paddleAuraNode)
+        
+        // Base Paddle
         paddleNode = SKShapeNode(rectOf: CGSize(width: currentPaddleWidth, height: paddleHeight), cornerRadius: 9)
         paddleNode.fillColor = gameState?.selectedSkin.uiColor ?? .cyan
         paddleNode.strokeColor = .white
@@ -141,10 +150,13 @@ final class GameScene: SKScene {
     func clearScene() {
         isPlaying = false
         feverTimeRemaining = 0
+        isWideActive = false
+        isMagnetActive = false
         paddleNode?.isHidden = true
+        paddleAuraNode?.isHidden = true
         dangerLineNode?.isHidden = true
-        for child in children where child !== paddleNode && child !== dangerLineNode {
-            if child.alpha > 0.01 { // Keep dummy warming nodes
+        for child in children where child !== paddleNode && child !== paddleAuraNode && child !== dangerLineNode {
+            if child.alpha > 0.01 {
                 child.removeFromParent()
             }
         }
@@ -168,12 +180,21 @@ final class GameScene: SKScene {
         spawnInterval = 0.85
         fallDuration = 3.2
         isMagnetActive = false
+        isWideActive = false
         feverTimeRemaining = 0
         
         updatePaddleWidth(to: defaultPaddleWidth)
+        let skinColor = gameState?.selectedSkin.uiColor ?? .cyan
         paddleNode.position.x = size.width / 2
-        paddleNode.fillColor = gameState?.selectedSkin.uiColor ?? .cyan
+        paddleAuraNode.position = paddleNode.position
+        paddleNode.fillColor = skinColor
+        paddleNode.strokeColor = .white
+        paddleNode.lineWidth = 2.5
+        paddleAuraNode.strokeColor = .clear
+        paddleAuraNode.fillColor = .clear
+        
         paddleNode.isHidden = false
+        paddleAuraNode.isHidden = false
         dangerLineNode?.isHidden = false
         isPlaying = true
     }
@@ -187,6 +208,45 @@ final class GameScene: SKScene {
             transform: nil
         )
         paddleNode.path = path
+        
+        let auraPath = CGPath(
+            roundedRect: CGRect(x: -(newWidth + 14) / 2, y: -(paddleHeight + 14) / 2, width: newWidth + 14, height: paddleHeight + 14),
+            cornerWidth: 16,
+            cornerHeight: 16,
+            transform: nil
+        )
+        paddleAuraNode.path = auraPath
+    }
+    
+    private func refreshPaddleAesthetics() {
+        // Paddle fill color ALWAYS stays true to the equipped skin
+        paddleNode.fillColor = gameState?.selectedSkin.uiColor ?? .cyan
+        
+        if feverTimeRemaining > 0 {
+            // Pulse Rush: Radiant gold border pulse + gold aura
+            paddleNode.strokeColor = UIColor(red: 1.0, green: 0.88, blue: 0.2, alpha: 1.0)
+            paddleNode.lineWidth = 3.5
+            paddleAuraNode.strokeColor = UIColor.yellow.withAlphaComponent(0.65)
+            paddleAuraNode.fillColor = UIColor.yellow.withAlphaComponent(0.12)
+        } else if isMagnetActive {
+            // Magnet: Electric yellow border + aura
+            paddleNode.strokeColor = .systemYellow
+            paddleNode.lineWidth = 3.0
+            paddleAuraNode.strokeColor = UIColor.systemYellow.withAlphaComponent(0.55)
+            paddleAuraNode.fillColor = UIColor.systemYellow.withAlphaComponent(0.08)
+        } else if isWideActive {
+            // Wide: Emerald green border + aura
+            paddleNode.strokeColor = .systemGreen
+            paddleNode.lineWidth = 3.0
+            paddleAuraNode.strokeColor = UIColor.systemGreen.withAlphaComponent(0.55)
+            paddleAuraNode.fillColor = UIColor.systemGreen.withAlphaComponent(0.08)
+        } else {
+            // Normal: Crisp white border
+            paddleNode.strokeColor = .white
+            paddleNode.lineWidth = 2.5
+            paddleAuraNode.strokeColor = .clear
+            paddleAuraNode.fillColor = .clear
+        }
     }
     
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -195,6 +255,7 @@ final class GameScene: SKScene {
         let halfWidth = currentPaddleWidth / 2
         let clampedX = max(halfWidth + 10, min(size.width - halfWidth - 10, location.x))
         paddleNode.position.x = clampedX
+        paddleAuraNode.position.x = clampedX
     }
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -237,7 +298,7 @@ final class GameScene: SKScene {
         checkPaddleCollisions()
         
         for child in children {
-            if child.position.y < (paddleYPosition - 35) && child !== paddleNode && child !== dangerLineNode && child.name != "floatingText" && child.alpha > 0.01 {
+            if child.position.y < (paddleYPosition - 35) && child !== paddleNode && child !== paddleAuraNode && child !== dangerLineNode && child.name != "floatingText" && child.alpha > 0.01 {
                 if child.name == OrbType.target.identifier && feverTimeRemaining <= 0 {
                     loseLife()
                 }
@@ -277,7 +338,6 @@ final class GameScene: SKScene {
         orb.lineWidth = 2.0
         orb.zPosition = 10
         
-        // Fast template cloning
         if let template = templateEmitter, let emitter = template.copy() as? SKEmitterNode {
             emitter.particleColor = orbType.color
             emitter.targetNode = self
@@ -294,7 +354,7 @@ final class GameScene: SKScene {
     private func checkPaddleCollisions() {
         let paddleFrame = paddleNode.frame.insetBy(dx: -4, dy: -4)
         
-        for child in children where child !== paddleNode && child !== dangerLineNode && child.name != "floatingText" && child.alpha > 0.01 {
+        for child in children where child !== paddleNode && child !== paddleAuraNode && child !== dangerLineNode && child.name != "floatingText" && child.alpha > 0.01 {
             guard let orb = child as? SKShapeNode, let name = orb.name else { continue }
             
             if (isMagnetActive || feverTimeRemaining > 0) && (name == OrbType.target.identifier || name == OrbType.feverGold.identifier) && orb.position.y < size.height * 0.65 {
@@ -375,7 +435,7 @@ final class GameScene: SKScene {
         feverTimeRemaining = 5.0
         gameState?.isFeverActive = true
         gameState?.activePowerupText = "PULSE RUSH!"
-        paddleNode.fillColor = UIColor(red: 1.0, green: 0.84, blue: 0.0, alpha: 1.0)
+        refreshPaddleAesthetics()
         showFloatingText(text: "⚡️ PULSE RUSH ⚡️", color: .yellow, at: CGPoint(x: size.width / 2, y: size.height / 2))
         shakeScreen(magnitude: 10)
         FeedbackManager.shared.playPulseRushFanfare()
@@ -386,7 +446,7 @@ final class GameScene: SKScene {
         if gameState?.activePowerupText == "PULSE RUSH!" {
             gameState?.activePowerupText = ""
         }
-        paddleNode.fillColor = gameState?.selectedSkin.uiColor ?? .cyan
+        refreshPaddleAesthetics()
         FeedbackManager.shared.resetFeverStreak()
     }
     
@@ -437,13 +497,15 @@ final class GameScene: SKScene {
     }
     
     private func triggerWidePaddle() {
+        isWideActive = true
         updatePaddleWidth(to: defaultPaddleWidth * 1.6)
-        paddleNode.fillColor = .systemGreen
+        refreshPaddleAesthetics()
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) { [weak self] in
             guard let self = self else { return }
+            self.isWideActive = false
             self.updatePaddleWidth(to: self.defaultPaddleWidth)
-            self.paddleNode.fillColor = (self.feverTimeRemaining > 0) ? .yellow : (self.gameState?.selectedSkin.uiColor ?? .cyan)
+            self.refreshPaddleAesthetics()
             if self.gameState?.activePowerupText == "WIDE" {
                 self.gameState?.activePowerupText = ""
             }
@@ -452,12 +514,12 @@ final class GameScene: SKScene {
     
     private func triggerMagnet() {
         isMagnetActive = true
-        paddleNode.strokeColor = .yellow
+        refreshPaddleAesthetics()
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) { [weak self] in
             guard let self = self else { return }
             self.isMagnetActive = false
-            self.paddleNode.strokeColor = .white
+            self.refreshPaddleAesthetics()
             if self.gameState?.activePowerupText == "MAGNET" {
                 self.gameState?.activePowerupText = ""
             }
@@ -511,7 +573,6 @@ final class GameScene: SKScene {
             let fade = SKAction.fadeOut(withDuration: 0.18)
             let group = SKAction.group([move, fade])
             let remove = SKAction.removeFromParent()
-            
             spark.run(SKAction.sequence([group, remove]))
         }
     }

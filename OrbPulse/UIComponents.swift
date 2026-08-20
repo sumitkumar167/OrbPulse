@@ -89,47 +89,36 @@ private struct StarCanvas: View {
     }
 }
 
-// MARK: - Landing Page View (With Locker Access & Currency Counter)
+// MARK: - Landing Page View (With Full-Width Smooth Skin Carousel & Arrow Controls)
 struct LandingView: View {
     @ObservedObject var gameState: GameState
     @State private var orbFloat = false
     @State private var glowPulse = false
-    @State private var showLocker = false
+    @State private var currentSkinIndex = 0
+    
+    private let allSkins = PaddleSkin.allCases
+    
+    var currentSkin: PaddleSkin {
+        allSkins[currentSkinIndex]
+    }
     
     var body: some View {
         VStack(spacing: 0) {
-            // Top Bar: Stardust Counter & Locker Button
+            // Top Bar: Stardust Counter
             HStack {
                 HStack(spacing: 6) {
                     Image(systemName: "sparkles")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundColor(.yellow)
                     Text("\(gameState.stardust)")
-                        .font(.system(size: 14, weight: .heavy, design: .rounded))
+                        .font(.system(size: 15, weight: .heavy, design: .rounded))
                         .foregroundColor(.white)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
                 .background(Capsule().fill(Color.white.opacity(0.08)))
                 
                 Spacer()
-                
-                Button(action: { showLocker = true }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "tshirt.fill")
-                            .font(.system(size: 13))
-                        Text("SKINS")
-                            .font(.system(size: 12, weight: .heavy, design: .monospaced))
-                    }
-                    .foregroundColor(gameState.selectedSkin.primaryColor)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .fill(Color.white.opacity(0.08))
-                            .overlay(Capsule().stroke(gameState.selectedSkin.primaryColor.opacity(0.5), lineWidth: 1))
-                    )
-                }
             }
             .padding(.horizontal, 24)
             .padding(.top, 56)
@@ -137,59 +126,149 @@ struct LandingView: View {
             // Logo
             VStack(spacing: 6) {
                 Text("ORB PULSE")
-                    .font(.system(size: 48, weight: .black, design: .rounded))
+                    .font(.system(size: 46, weight: .black, design: .rounded))
                     .foregroundColor(.white)
-                    .shadow(color: gameState.selectedSkin.primaryColor.opacity(glowPulse ? 0.9 : 0.4), radius: glowPulse ? 22 : 12)
+                    .shadow(color: currentSkin.primaryColor.opacity(glowPulse ? 0.9 : 0.4), radius: glowPulse ? 22 : 12)
                 
                 Text("REFLEX ARCADE")
                     .font(.system(size: 12, weight: .bold, design: .monospaced))
                     .tracking(4)
-                    .foregroundColor(gameState.selectedSkin.primaryColor.opacity(0.8))
+                    .foregroundColor(currentSkin.primaryColor.opacity(0.85))
             }
-            .padding(.top, 24)
+            .padding(.top, 14)
             
             Spacer()
             
-            // Hero Animation Preview
-            ZStack {
-                Circle()
-                    .fill(RadialGradient(colors: [gameState.selectedSkin.primaryColor.opacity(0.25), .clear], center: .center, startRadius: 10, endRadius: 100))
-                    .frame(width: 200, height: 200)
+            // ⚡️ Hero Section: Large Full-Width Swipeable Skin Carousel
+            VStack(spacing: 20) {
+                // Interactive Orb & Paddle Showcase
+                ZStack {
+                    Circle()
+                        .fill(RadialGradient(colors: [currentSkin.primaryColor.opacity(0.3), .clear], center: .center, startRadius: 10, endRadius: 110))
+                        .frame(width: 220, height: 220)
+                    
+                    Circle()
+                        .fill(currentSkin.primaryColor)
+                        .frame(width: 36, height: 36)
+                        .overlay(Circle().stroke(Color.white, lineWidth: 2.5))
+                        .shadow(color: currentSkin.primaryColor, radius: 14)
+                        .offset(y: orbFloat ? -18 : 6)
+                    
+                    RoundedRectangle(cornerRadius: 9)
+                        .fill(currentSkin.primaryColor)
+                        .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.white, lineWidth: 2))
+                        .frame(width: 110, height: 18)
+                        .shadow(color: currentSkin.primaryColor.opacity(0.85), radius: 12)
+                        .offset(y: 45)
+                }
+                .frame(height: 120)
                 
-                Circle()
-                    .fill(gameState.selectedSkin.primaryColor)
-                    .frame(width: 36, height: 36)
-                    .overlay(Circle().stroke(Color.white, lineWidth: 2.5))
-                    .shadow(color: gameState.selectedSkin.primaryColor, radius: 14)
-                    .offset(y: orbFloat ? -18 : 8)
+                // Skin Navigation Row (< Skin Name >)
+                HStack(spacing: 20) {
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            currentSkinIndex = (currentSkinIndex - 1 + allSkins.count) % allSkins.count
+                            syncSkinSelection()
+                        }
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white.opacity(0.7))
+                            .padding(10)
+                            .background(Circle().fill(Color.white.opacity(0.08)))
+                    }
+                    
+                    VStack(spacing: 4) {
+                        Text(currentSkin.rawValue)
+                            .font(.system(size: 18, weight: .heavy, design: .rounded))
+                            .foregroundColor(.white)
+                        
+                        let isUnlocked = gameState.unlockedSkins.contains(currentSkin.rawValue)
+                        let isEquipped = gameState.selectedSkin == currentSkin
+                        
+                        if isEquipped {
+                            Text("EQUIPPED")
+                                .font(.system(size: 10, weight: .black, design: .monospaced))
+                                .foregroundColor(.green)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Capsule().fill(Color.green.opacity(0.2)))
+                        } else if isUnlocked {
+                            Button(action: {
+                                gameState.equipSkin(currentSkin)
+                            }) {
+                                Text("TAP TO EQUIP")
+                                    .font(.system(size: 10, weight: .black, design: .monospaced))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 4)
+                                    .background(Capsule().fill(Color.white.opacity(0.18)))
+                            }
+                        } else {
+                            Button(action: {
+                                _ = gameState.unlockSkin(currentSkin)
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "lock.fill").font(.system(size: 9))
+                                    Text("UNLOCK • ✦ \(currentSkin.cost)")
+                                        .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                                }
+                                .foregroundColor(gameState.stardust >= currentSkin.cost ? .black : .white.opacity(0.5))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 4)
+                                .background(
+                                    Capsule().fill(gameState.stardust >= currentSkin.cost ? Color.yellow : Color.white.opacity(0.1))
+                                )
+                            }
+                            .disabled(gameState.stardust < currentSkin.cost)
+                        }
+                    }
+                    .frame(minWidth: 160)
+                    
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            currentSkinIndex = (currentSkinIndex + 1) % allSkins.count
+                            syncSkinSelection()
+                        }
+                    }) {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white.opacity(0.7))
+                            .padding(10)
+                            .background(Circle().fill(Color.white.opacity(0.08)))
+                    }
+                }
                 
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(gameState.selectedSkin.primaryColor)
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white, lineWidth: 2))
-                    .frame(width: 90, height: 16)
-                    .shadow(color: gameState.selectedSkin.primaryColor.opacity(0.8), radius: 10)
-                    .offset(y: 50)
+                // Clean Custom Pagination Dots (Zero Text Overlap)
+                HStack(spacing: 8) {
+                    ForEach(0..<allSkins.count, id: \.self) { idx in
+                        Circle()
+                            .fill(idx == currentSkinIndex ? currentSkin.primaryColor : Color.white.opacity(0.2))
+                            .frame(width: idx == currentSkinIndex ? 8 : 6, height: idx == currentSkinIndex ? 8 : 6)
+                            .animation(.spring(), value: currentSkinIndex)
+                    }
+                }
             }
-            .frame(height: 140)
-            
-            Spacer()
-            
-            // Legend
-            HStack(spacing: 18) {
-                legendItem(color: .cyan, label: "CATCH")
-                legendItem(color: .red, label: "DODGE")
-                legendItem(color: .green, label: "EXPAND")
-                legendItem(color: .yellow, label: "RUSH")
-            }
-            .padding(.vertical, 14)
-            .padding(.horizontal, 22)
-            .background(
-                RoundedRectangle(cornerRadius: 18)
-                    .fill(Color.white.opacity(0.06))
-                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            .padding(.vertical, 16)
+            .contentShape(Rectangle())
+            // Horizontal swipe gesture across the whole card
+            .gesture(
+                DragGesture(minimumDistance: 25)
+                    .onEnded { value in
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            if value.translation.width < -30 {
+                                currentSkinIndex = (currentSkinIndex + 1) % allSkins.count
+                            } else if value.translation.width > 30 {
+                                currentSkinIndex = (currentSkinIndex - 1 + allSkins.count) % allSkins.count
+                            }
+                            syncSkinSelection()
+                        }
+                    }
             )
-            .padding(.bottom, 24)
             
+            Spacer()
+            
+            // Best Score Banner
             if gameState.highScore > 0 {
                 HStack(spacing: 18) {
                     HStack(spacing: 6) {
@@ -208,10 +287,10 @@ struct LandingView: View {
                             .foregroundColor(.gray)
                     }
                 }
-                .padding(.bottom, 20)
+                .padding(.bottom, 16)
             }
             
-            // Play Button
+            // Big Play Button
             Button(action: {
                 gameState.isInMenu = false
                 gameState.restartTrigger.toggle()
@@ -226,17 +305,17 @@ struct LandingView: View {
                 .padding(.vertical, 18)
                 .background(
                     Capsule()
-                        .fill(gameState.selectedSkin.primaryColor)
-                        .shadow(color: gameState.selectedSkin.primaryColor.opacity(0.6), radius: 14, y: 4)
+                        .fill(currentSkin.primaryColor)
+                        .shadow(color: currentSkin.primaryColor.opacity(0.6), radius: 14, y: 4)
                 )
             }
             .padding(.horizontal, 36)
-            .padding(.bottom, 40)
-        }
-        .sheet(isPresented: $showLocker) {
-            PaddleLockerModal(gameState: gameState)
+            .padding(.bottom, 36)
         }
         .onAppear {
+            if let idx = allSkins.firstIndex(of: gameState.selectedSkin) {
+                currentSkinIndex = idx
+            }
             withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) {
                 orbFloat = true
                 glowPulse = true
@@ -244,13 +323,9 @@ struct LandingView: View {
         }
     }
     
-    private func legendItem(color: Color, label: String) -> some View {
-        VStack(spacing: 6) {
-            Circle().fill(color).frame(width: 22, height: 22)
-                .overlay(Circle().stroke(Color.white, lineWidth: 1.5))
-            Text(label)
-                .font(.system(size: 10, weight: .black))
-                .foregroundColor(color)
+    private func syncSkinSelection() {
+        if gameState.unlockedSkins.contains(currentSkin.rawValue) {
+            gameState.equipSkin(currentSkin)
         }
     }
 }
@@ -391,13 +466,17 @@ struct PaddleLockerModal: View {
     }
 }
 
-// MARK: - Game Over Modal (With Stardust Reward Banner)
+// MARK: - Game Over Modal (With Next Skin Unlock Progress Bar)
 struct GameOverModal: View {
     @ObservedObject var gameState: GameState
     var scene: GameScene
     
     var isNewHigh: Bool {
         gameState.score >= gameState.highScore && gameState.score > 0
+    }
+    
+    var nextLockedSkin: PaddleSkin? {
+        PaddleSkin.allCases.first { !gameState.unlockedSkins.contains($0.rawValue) }
     }
     
     var body: some View {
@@ -409,10 +488,10 @@ struct GameOverModal: View {
                     gameState.restartTrigger.toggle()
                 }
             
-            VStack(spacing: 24) {
+            VStack(spacing: 20) {
                 VStack(spacing: 6) {
                     Text("GAME OVER")
-                        .font(.system(size: 34, weight: .black, design: .rounded))
+                        .font(.system(size: 32, weight: .black, design: .rounded))
                         .foregroundColor(.white)
                     
                     if isNewHigh {
@@ -428,51 +507,81 @@ struct GameOverModal: View {
                     }
                 }
                 
-                VStack(spacing: 16) {
-                    VStack(spacing: 4) {
+                // Score Box
+                VStack(spacing: 14) {
+                    VStack(spacing: 2) {
                         Text("FINAL SCORE")
                             .font(.system(size: 11, weight: .bold, design: .monospaced))
                             .foregroundColor(.gray)
                         Text("\(gameState.score)")
-                            .font(.system(size: 52, weight: .black, design: .rounded))
+                            .font(.system(size: 48, weight: .black, design: .rounded))
                             .foregroundColor(gameState.selectedSkin.primaryColor)
                             .shadow(color: gameState.selectedSkin.primaryColor.opacity(0.5), radius: 12)
                     }
                     
                     Divider().background(Color.white.opacity(0.1))
                     
-                    HStack(spacing: 32) {
+                    HStack(spacing: 28) {
                         VStack(spacing: 2) {
                             Text("BEST")
                                 .font(.system(size: 10, weight: .bold))
                                 .foregroundColor(.gray)
                             Text("\(gameState.highScore)")
-                                .font(.system(size: 18, weight: .heavy, design: .rounded))
+                                .font(.system(size: 17, weight: .heavy, design: .rounded))
                                 .foregroundColor(.white)
                         }
                         
                         VStack(spacing: 2) {
-                            Text("STARDUST")
+                            Text("TOTAL STARDUST")
                                 .font(.system(size: 10, weight: .bold))
                                 .foregroundColor(.gray)
                             HStack(spacing: 4) {
                                 Image(systemName: "sparkles")
                                     .font(.caption2)
                                 Text("\(gameState.stardust)")
-                                    .font(.system(size: 18, weight: .heavy, design: .rounded))
+                                    .font(.system(size: 17, weight: .heavy, design: .rounded))
                             }
                             .foregroundColor(.yellow)
                         }
                     }
                 }
-                .padding(24)
+                .padding(20)
                 .background(
                     RoundedRectangle(cornerRadius: 22)
                         .fill(Color.white.opacity(0.05))
                         .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.1), lineWidth: 1))
                 )
                 
-                HStack(spacing: 14) {
+                // ⚡️ Psychological Hook: Skin Unlock Progress Bar
+                if let next = nextLockedSkin {
+                    let progress = min(1.0, Double(gameState.stardust) / Double(next.cost))
+                    VStack(spacing: 6) {
+                        HStack {
+                            Text("UNLOCK \(next.rawValue.uppercased())")
+                                .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                                .foregroundColor(next.primaryColor)
+                            Spacer()
+                            Text("✦ \(gameState.stardust)/\(next.cost)")
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .foregroundColor(.gray)
+                        }
+                        
+                        GeometryReader { g in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(Color.white.opacity(0.1))
+                                Capsule()
+                                    .fill(next.primaryColor)
+                                    .frame(width: g.size.width * CGFloat(progress))
+                            }
+                        }
+                        .frame(height: 6)
+                    }
+                    .padding(14)
+                    .background(RoundedRectangle(cornerRadius: 16).fill(Color.white.opacity(0.04)))
+                }
+                
+                // Action Buttons
+                HStack(spacing: 12) {
                     Button(action: {
                         gameState.lastScore = gameState.score
                         gameState.isGameOver = false
@@ -483,11 +592,11 @@ struct GameOverModal: View {
                             Image(systemName: "house.fill")
                             Text("MENU")
                         }
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
                         .foregroundColor(.white.opacity(0.8))
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(RoundedRectangle(cornerRadius: 16).fill(Color.white.opacity(0.12)))
+                        .padding(.vertical, 14)
+                        .background(RoundedRectangle(cornerRadius: 14).fill(Color.white.opacity(0.12)))
                     }
                     
                     Button(action: {
@@ -497,10 +606,10 @@ struct GameOverModal: View {
                             Image(systemName: "arrow.counterclockwise")
                             Text("RETRY")
                         }
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(.system(size: 14, weight: .black, design: .rounded))
                         .foregroundColor(.black)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
+                        .padding(.vertical, 14)
                         .background(Capsule().fill(gameState.selectedSkin.primaryColor).shadow(color: gameState.selectedSkin.primaryColor.opacity(0.5), radius: 10))
                     }
                 }
@@ -508,16 +617,16 @@ struct GameOverModal: View {
                 Text("TAP ANYWHERE TO REPLAY")
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundColor(.white.opacity(0.35))
-                    .padding(.top, -6)
+                    .padding(.top, -4)
             }
-            .padding(28)
+            .padding(24)
             .background(
                 RoundedRectangle(cornerRadius: 28)
                     .fill(Color(red: 0.08, green: 0.07, blue: 0.14))
                     .overlay(RoundedRectangle(cornerRadius: 28).stroke(Color.white.opacity(0.12), lineWidth: 1))
                     .shadow(color: .black.opacity(0.6), radius: 30)
             )
-            .padding(.horizontal, 24)
+            .padding(.horizontal, 22)
         }
     }
 }
