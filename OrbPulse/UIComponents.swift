@@ -89,7 +89,7 @@ private struct StarCanvas: View {
     }
 }
 
-// MARK: - Landing Page View (With Full-Width Smooth Skin Carousel & Arrow Controls)
+// MARK: - Landing Page View (Refined Retro Spacecraft)
 struct LandingView: View {
     @ObservedObject var gameState: GameState
     @State private var orbFloat = false
@@ -104,7 +104,7 @@ struct LandingView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Top Bar: Stardust Counter
+            // Top Bar: Stardust Bank
             HStack {
                 HStack(spacing: 6) {
                     Image(systemName: "sparkles")
@@ -123,7 +123,7 @@ struct LandingView: View {
             .padding(.horizontal, 24)
             .padding(.top, 56)
             
-            // Logo
+            // Retro Title
             VStack(spacing: 6) {
                 Text("ORB PULSE")
                     .font(.system(size: 46, weight: .black, design: .rounded))
@@ -139,31 +139,61 @@ struct LandingView: View {
             
             Spacer()
             
-            // ⚡️ Hero Section: Large Full-Width Swipeable Skin Carousel
-            VStack(spacing: 20) {
-                // Interactive Orb & Paddle Showcase
+            // Hero Showcase: Retro Spacecraft Paddle
+            VStack(spacing: 24) {
                 ZStack {
+                    // Ambient Halo
                     Circle()
-                        .fill(RadialGradient(colors: [currentSkin.primaryColor.opacity(0.3), .clear], center: .center, startRadius: 10, endRadius: 110))
-                        .frame(width: 220, height: 220)
+                        .fill(RadialGradient(colors: [currentSkin.primaryColor.opacity(0.35), .clear], center: .center, startRadius: 10, endRadius: 120))
+                        .frame(width: 240, height: 240)
                     
+                    // Luminous Target Orb
                     Circle()
                         .fill(currentSkin.primaryColor)
                         .frame(width: 36, height: 36)
                         .overlay(Circle().stroke(Color.white, lineWidth: 2.5))
-                        .shadow(color: currentSkin.primaryColor, radius: 14)
-                        .offset(y: orbFloat ? -18 : 6)
+                        .shadow(color: currentSkin.primaryColor, radius: 16)
+                        .offset(y: orbFloat ? -22 : 4)
                     
-                    RoundedRectangle(cornerRadius: 9)
-                        .fill(currentSkin.primaryColor)
-                        .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.white, lineWidth: 2))
-                        .frame(width: 110, height: 18)
-                        .shadow(color: currentSkin.primaryColor.opacity(0.85), radius: 12)
-                        .offset(y: 45)
+                    // Spacecraft Paddle Visual
+                    VStack(spacing: 0) {
+                        ZStack {
+                            // Dark Carbon Chassis with Cyber Bevel
+                            CyberPaddleShape()
+                                .fill(Color(red: 0.08, green: 0.09, blue: 0.14))
+                                .frame(width: 120, height: 20)
+                                .overlay(
+                                    CyberPaddleShape()
+                                        .stroke(currentSkin.primaryColor, lineWidth: 2)
+                                        .shadow(color: currentSkin.primaryColor.opacity(0.8), radius: 8)
+                                )
+                            
+                            // Luminous Plasma Core
+                            Capsule()
+                                .fill(currentSkin.primaryColor)
+                                .frame(width: 86, height: 4)
+                                .overlay(Capsule().stroke(Color.white, lineWidth: 1))
+                                .shadow(color: currentSkin.primaryColor, radius: 6)
+                        }
+                        
+                        // Unified Under-Engine Plasma Exhaust Plume
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [currentSkin.primaryColor.opacity(0.8), currentSkin.primaryColor.opacity(0.0)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .frame(width: 80, height: 14)
+                            .blur(radius: 2)
+                            .offset(y: -1)
+                    }
+                    .offset(y: 44)
                 }
-                .frame(height: 120)
+                .frame(height: 140)
                 
-                // Skin Navigation Row (< Skin Name >)
+                // Interactive Selector (< Skin Name >)
                 HStack(spacing: 20) {
                     Button(action: {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -172,7 +202,7 @@ struct LandingView: View {
                         }
                     }) {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 18, weight: .bold))
+                            .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.white.opacity(0.7))
                             .padding(10)
                             .background(Circle().fill(Color.white.opacity(0.08)))
@@ -232,14 +262,14 @@ struct LandingView: View {
                         }
                     }) {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 18, weight: .bold))
+                            .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.white.opacity(0.7))
                             .padding(10)
                             .background(Circle().fill(Color.white.opacity(0.08)))
                     }
                 }
                 
-                // Clean Custom Pagination Dots (Zero Text Overlap)
+                // Pagination Dots
                 HStack(spacing: 8) {
                     ForEach(0..<allSkins.count, id: \.self) { idx in
                         Circle()
@@ -251,7 +281,6 @@ struct LandingView: View {
             }
             .padding(.vertical, 16)
             .contentShape(Rectangle())
-            // Horizontal swipe gesture across the whole card
             .gesture(
                 DragGesture(minimumDistance: 25)
                     .onEnded { value in
@@ -290,7 +319,7 @@ struct LandingView: View {
                 .padding(.bottom, 16)
             }
             
-            // Big Play Button
+            // Play Button
             Button(action: {
                 gameState.isInMenu = false
                 gameState.restartTrigger.toggle()
@@ -326,6 +355,38 @@ struct LandingView: View {
     private func syncSkinSelection() {
         if gameState.unlockedSkins.contains(currentSkin.rawValue) {
             gameState.equipSkin(currentSkin)
+        }
+    }
+}
+
+// MARK: - Cyberpunk Beveled Polygon
+private struct CyberPaddleShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let b: CGFloat = 6.0
+        path.move(to: CGPoint(x: rect.minX + b, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX - b, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + b))
+        path.addLine(to: CGPoint(x: rect.maxX - (b * 0.75), y: rect.maxY - b))
+        path.addLine(to: CGPoint(x: rect.maxX - b * 2, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX + b * 2, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX + (b * 0.75), y: rect.maxY - b))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + b))
+        path.closeSubpath()
+        return path
+    }
+}
+
+
+private struct ThrusterFlame: View {
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            Capsule()
+                .fill(LinearGradient(colors: [color, color.opacity(0)], startPoint: .top, endPoint: .bottom))
+                .frame(width: 8, height: 16)
+                .blur(radius: 1)
         }
     }
 }

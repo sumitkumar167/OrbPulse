@@ -1,6 +1,8 @@
 import SpriteKit
 import UIKit
 
+// MARK: - Orb Entity Types
+/// Defines the distinct categories of orbs falling through the gameplay scene.
 enum OrbType {
     case target
     case hazard
@@ -8,6 +10,7 @@ enum OrbType {
     case magnet
     case feverGold
     
+    /// Unique identifier string used for node identification and collision routing.
     var identifier: String {
         switch self {
         case .target: return "targetOrb"
@@ -18,6 +21,7 @@ enum OrbType {
         }
     }
     
+    /// The signature neon chromatic value representing the orb.
     var color: UIColor {
         switch self {
         case .target: return .systemCyan
@@ -29,30 +33,47 @@ enum OrbType {
     }
 }
 
+// MARK: - Game Scene Implementation
+/// Core SpriteKit rendering and physics simulation loop for the Orb Pulse arcade experience.
 final class GameScene: SKScene {
+    
+    // MARK: - Public Properties
+    /// Weak reference to the shared SwiftUI reactive game state container.
     weak var gameState: GameState?
     
+    // MARK: - Scene State
     private var isPlaying = false
     private var timeElapsed: TimeInterval = 0
     private var lastSpawnTime: TimeInterval = 0
     private var spawnInterval: TimeInterval = 0.85
     private var fallDuration: Double = 3.2
     
-    private var paddleNode: SKShapeNode!
-    private var paddleAuraNode: SKShapeNode! // ⚡️ Dedicated aura glow node
-    private var dangerLineNode: SKShapeNode!
-    private var particleTexture: SKTexture?
-    private var templateEmitter: SKEmitterNode?
+    // MARK: - Paddle Architecture
+    private var paddleContainer: SKNode!
+    private var paddleChassis: SKShapeNode!
+    private var paddleCore: SKShapeNode!
+    private var plasmaEngineEmitter: SKEmitterNode?
     
-    private let defaultPaddleWidth: CGFloat = 110.0
-    private var currentPaddleWidth: CGFloat = 110.0
+    // MARK: - Dimensions & Physical Constants
+    private let defaultPaddleWidth: CGFloat = 114.0
+    private var currentPaddleWidth: CGFloat = 114.0
     private let paddleHeight: CGFloat = 18.0
     private let paddleYPosition: CGFloat = 120.0
     
+    // MARK: - Powerup & Mode Lifecycles
     private var isMagnetActive = false
     private var isWideActive = false
     private var feverTimeRemaining: Double = 0.0
     
+    // MARK: - Motion Throttle State
+    private var lastTouchX: CGFloat = 0
+    private var currentVelocityX: CGFloat = 0
+    
+    // MARK: - Cached Assets & Prototypes
+    private var particleTexture: SKTexture?
+    private var templateEmitter: SKEmitterNode?
+    
+    // MARK: - Lifecycle Hooks
     override func didMove(to view: SKView) {
         backgroundColor = .clear
         view.allowsTransparency = true
@@ -63,11 +84,11 @@ final class GameScene: SKScene {
         createParticleTexture(in: view)
         setupTemplateEmitter()
         preWarmFontAtlas()
-        
-        setupDangerLine()
         setupPaddle()
     }
     
+    // MARK: - Asset Pre-Warming
+    /// Renders a radial gradient texture for smooth, GPU-accelerated particle blending.
     private func createParticleTexture(in view: SKView) {
         let size = CGSize(width: 32, height: 32)
         let renderer = UIGraphicsImageRenderer(size: size)
@@ -82,6 +103,7 @@ final class GameScene: SKScene {
         particleTexture = SKTexture(image: img)
     }
     
+    /// Pre-configures a shared prototype emitter to avoid runtime instantiation latency.
     private func setupTemplateEmitter() {
         let emitter = SKEmitterNode()
         emitter.particleTexture = particleTexture
@@ -103,6 +125,7 @@ final class GameScene: SKScene {
         templateEmitter = emitter
     }
     
+    /// Pre-rasterizes CoreText glyph textures to guarantee hitch-free font rendering during gameplay.
     private func preWarmFontAtlas() {
         let dummyLabel = SKLabelNode(text: "⚡️ PULSE RUSH ⚡️ PERFECT! +25 👑 NEW RECORD! 👑")
         dummyLabel.fontName = "AvenirNext-Heavy"
@@ -112,56 +135,102 @@ final class GameScene: SKScene {
         addChild(dummyLabel)
     }
     
-    private func setupDangerLine() {
-        dangerLineNode?.removeFromParent()
-        dangerLineNode = SKShapeNode(rectOf: CGSize(width: size.width, height: 1.5))
-        dangerLineNode.position = CGPoint(x: size.width / 2, y: paddleYPosition - 20)
-        dangerLineNode.fillColor = UIColor.cyan.withAlphaComponent(0.2)
-        dangerLineNode.strokeColor = .clear
-        dangerLineNode.zPosition = 1
-        addChild(dangerLineNode)
-    }
-    
+    // MARK: - Paddle Assembly
+    /// Builds the retro-futuristic spacecraft paddle with cybernetic geometry and plasma under-glow.
     private func setupPaddle() {
-        paddleNode?.removeFromParent()
-        paddleAuraNode?.removeFromParent()
+        paddleContainer?.removeFromParent()
+        paddleContainer = SKNode()
+        paddleContainer.position = CGPoint(x: size.width / 2, y: paddleYPosition)
+        paddleContainer.zPosition = 100
+        paddleContainer.isHidden = true
+        addChild(paddleContainer)
+        
         currentPaddleWidth = defaultPaddleWidth
         
-        // Outer Dynamic Glow Aura
-        paddleAuraNode = SKShapeNode(rectOf: CGSize(width: currentPaddleWidth + 14, height: paddleHeight + 14), cornerRadius: 16)
-        paddleAuraNode.fillColor = .clear
-        paddleAuraNode.strokeColor = .clear
-        paddleAuraNode.lineWidth = 4.0
-        paddleAuraNode.zPosition = 99
-        paddleAuraNode.isHidden = true
-        addChild(paddleAuraNode)
+        // 1. Aerodynamic Carbon-Fiber Chassis
+        paddleChassis = SKShapeNode()
+        paddleChassis.path = createCyberpunkPath(width: currentPaddleWidth, height: paddleHeight)
+        paddleChassis.fillColor = UIColor(red: 0.06, green: 0.07, blue: 0.11, alpha: 0.96)
+        paddleChassis.strokeColor = gameState?.selectedSkin.uiColor ?? .cyan
+        paddleChassis.lineWidth = 2.0
+        paddleContainer.addChild(paddleChassis)
         
-        // Base Paddle
-        paddleNode = SKShapeNode(rectOf: CGSize(width: currentPaddleWidth, height: paddleHeight), cornerRadius: 9)
-        paddleNode.fillColor = gameState?.selectedSkin.uiColor ?? .cyan
-        paddleNode.strokeColor = .white
-        paddleNode.lineWidth = 2.5
-        paddleNode.position = CGPoint(x: size.width / 2, y: paddleYPosition)
-        paddleNode.zPosition = 100
-        paddleNode.isHidden = true
-        addChild(paddleNode)
+        // 2. Luminous Neon Plasma Core
+        paddleCore = SKShapeNode(rectOf: CGSize(width: currentPaddleWidth - 28, height: 4), cornerRadius: 2)
+        paddleCore.fillColor = gameState?.selectedSkin.uiColor ?? .cyan
+        paddleCore.strokeColor = .white
+        paddleCore.lineWidth = 1.0
+        paddleCore.position = CGPoint(x: 0, y: 0)
+        paddleContainer.addChild(paddleCore)
+        
+        // 3. Continuous Under-Engine Plasma Exhaust Plume
+        setupPlasmaEngine()
     }
     
+    /// Assembles the unified under-engine plasma plume with dynamic throttle control.
+    private func setupPlasmaEngine() {
+        plasmaEngineEmitter?.removeFromParent()
+        
+        let emitter = SKEmitterNode()
+        emitter.particleTexture = particleTexture
+        emitter.particleBirthRate = 50
+        emitter.particleLifetime = 0.18
+        emitter.particleLifetimeRange = 0.04
+        emitter.particlePositionRange = CGVector(dx: currentPaddleWidth * 0.65, dy: 2)
+        emitter.particleSpeed = 25
+        emitter.particleSpeedRange = 10
+        emitter.emissionAngle = -.pi / 2
+        emitter.emissionAngleRange = .pi / 16
+        emitter.particleScale = 0.55
+        emitter.particleScaleSpeed = -1.8
+        emitter.particleAlpha = 0.65
+        emitter.particleColor = gameState?.selectedSkin.uiColor ?? .cyan
+        emitter.particleBlendMode = .add
+        emitter.position = CGPoint(x: 0, y: -paddleHeight / 2)
+        emitter.targetNode = self
+        emitter.zPosition = -1
+        
+        paddleContainer.addChild(emitter)
+        plasmaEngineEmitter = emitter
+    }
+    
+    /// Generates a beveled, aerodynamic polygon path for the retro spacecraft.
+    private func createCyberpunkPath(width: CGFloat, height: CGFloat) -> CGPath {
+        let halfW = width / 2
+        let halfH = height / 2
+        let bevel: CGFloat = 6.0
+        
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: -halfW + bevel, y: halfH))
+        path.addLine(to: CGPoint(x: halfW - bevel, y: halfH))
+        path.addLine(to: CGPoint(x: halfW, y: halfH - bevel))
+        path.addLine(to: CGPoint(x: halfW - (bevel * 0.75), y: -halfH + bevel))
+        path.addLine(to: CGPoint(x: halfW - bevel * 2, y: -halfH))
+        path.addLine(to: CGPoint(x: -halfW + bevel * 2, y: -halfH))
+        path.addLine(to: CGPoint(x: -halfW + (bevel * 0.75), y: -halfH + bevel))
+        path.addLine(to: CGPoint(x: -halfW, y: halfH - bevel))
+        path.closeSubpath()
+        return path
+    }
+    
+    // MARK: - Game Lifecycle Controls
+    /// Purges all active gameplay orbs and particle instances from the visual hierarchy.
     func clearScene() {
         isPlaying = false
         feverTimeRemaining = 0
         isWideActive = false
         isMagnetActive = false
-        paddleNode?.isHidden = true
-        paddleAuraNode?.isHidden = true
-        dangerLineNode?.isHidden = true
-        for child in children where child !== paddleNode && child !== paddleAuraNode && child !== dangerLineNode {
+        paddleContainer?.isHidden = true
+        paddleContainer?.zRotation = 0
+        
+        for child in children where child !== paddleContainer {
             if child.alpha > 0.01 {
                 child.removeFromParent()
             }
         }
     }
     
+    /// Resets scores, multipliers, paddle geometry, and boots the main game loop.
     func startGame() {
         clearScene()
         
@@ -182,71 +251,21 @@ final class GameScene: SKScene {
         isMagnetActive = false
         isWideActive = false
         feverTimeRemaining = 0
+        currentVelocityX = 0
         
         updatePaddleWidth(to: defaultPaddleWidth)
-        let skinColor = gameState?.selectedSkin.uiColor ?? .cyan
-        paddleNode.position.x = size.width / 2
-        paddleAuraNode.position = paddleNode.position
-        paddleNode.fillColor = skinColor
-        paddleNode.strokeColor = .white
-        paddleNode.lineWidth = 2.5
-        paddleAuraNode.strokeColor = .clear
-        paddleAuraNode.fillColor = .clear
+        paddleContainer.position.x = size.width / 2
+        lastTouchX = paddleContainer.position.x
+        refreshPaddleAesthetics()
         
-        paddleNode.isHidden = false
-        paddleAuraNode.isHidden = false
-        dangerLineNode?.isHidden = false
+        paddleContainer.isHidden = false
         isPlaying = true
     }
     
-    private func updatePaddleWidth(to newWidth: CGFloat) {
-        currentPaddleWidth = newWidth
-        let path = CGPath(
-            roundedRect: CGRect(x: -newWidth / 2, y: -paddleHeight / 2, width: newWidth, height: paddleHeight),
-            cornerWidth: 9,
-            cornerHeight: 9,
-            transform: nil
-        )
-        paddleNode.path = path
-        
-        let auraPath = CGPath(
-            roundedRect: CGRect(x: -(newWidth + 14) / 2, y: -(paddleHeight + 14) / 2, width: newWidth + 14, height: paddleHeight + 14),
-            cornerWidth: 16,
-            cornerHeight: 16,
-            transform: nil
-        )
-        paddleAuraNode.path = auraPath
-    }
-    
-    private func refreshPaddleAesthetics() {
-        // Paddle fill color ALWAYS stays true to the equipped skin
-        paddleNode.fillColor = gameState?.selectedSkin.uiColor ?? .cyan
-        
-        if feverTimeRemaining > 0 {
-            // Pulse Rush: Radiant gold border pulse + gold aura
-            paddleNode.strokeColor = UIColor(red: 1.0, green: 0.88, blue: 0.2, alpha: 1.0)
-            paddleNode.lineWidth = 3.5
-            paddleAuraNode.strokeColor = UIColor.yellow.withAlphaComponent(0.65)
-            paddleAuraNode.fillColor = UIColor.yellow.withAlphaComponent(0.12)
-        } else if isMagnetActive {
-            // Magnet: Electric yellow border + aura
-            paddleNode.strokeColor = .systemYellow
-            paddleNode.lineWidth = 3.0
-            paddleAuraNode.strokeColor = UIColor.systemYellow.withAlphaComponent(0.55)
-            paddleAuraNode.fillColor = UIColor.systemYellow.withAlphaComponent(0.08)
-        } else if isWideActive {
-            // Wide: Emerald green border + aura
-            paddleNode.strokeColor = .systemGreen
-            paddleNode.lineWidth = 3.0
-            paddleAuraNode.strokeColor = UIColor.systemGreen.withAlphaComponent(0.55)
-            paddleAuraNode.fillColor = UIColor.systemGreen.withAlphaComponent(0.08)
-        } else {
-            // Normal: Crisp white border
-            paddleNode.strokeColor = .white
-            paddleNode.lineWidth = 2.5
-            paddleAuraNode.strokeColor = .clear
-            paddleAuraNode.fillColor = .clear
-        }
+    // MARK: - Touch Interaction & Throttle Mechanics
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard let touch = touches.first else { return }
+        lastTouchX = touch.location(in: self).x
     }
     
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -254,14 +273,49 @@ final class GameScene: SKScene {
         let location = touch.location(in: self)
         let halfWidth = currentPaddleWidth / 2
         let clampedX = max(halfWidth + 10, min(size.width - halfWidth - 10, location.x))
-        paddleNode.position.x = clampedX
-        paddleAuraNode.position.x = clampedX
+        
+        // Calculate instantaneous horizontal velocity for dynamic engine throttling
+        let dx = clampedX - paddleContainer.position.x
+        currentVelocityX = dx
+        paddleContainer.position.x = clampedX
+        lastTouchX = clampedX
+        
+        // Dynamic Throttle: Increase engine burn rate and particle speed on movement
+        applyEngineThrottle(intensity: min(1.0, abs(dx) / 12.0))
     }
     
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        touchesMoved(touches, with: event)
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        settleEngineToIdle()
     }
     
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        settleEngineToIdle()
+    }
+    
+    /// Elevates thruster particle output and banking angle based on finger motion velocity.
+    private func applyEngineThrottle(intensity: CGFloat) {
+        guard let emitter = plasmaEngineEmitter else { return }
+        
+        let targetBirthRate = 50.0 + (Double(intensity) * 140.0)
+        let targetSpeed = 25.0 + (Double(intensity) * 60.0)
+        
+        emitter.particleBirthRate = targetBirthRate
+        emitter.particleSpeed = targetSpeed
+        
+        // Subtle banking tilt toward the direction of travel
+        let bankAngle = -currentVelocityX * 0.004
+        let clampedAngle = max(-0.12, min(0.12, bankAngle))
+        paddleContainer.run(SKAction.rotate(toAngle: clampedAngle, duration: 0.05, shortestUnitArc: true))
+    }
+    
+    /// Smoothly transitions engine emissions back to idle hover dynamics.
+    private func settleEngineToIdle() {
+        plasmaEngineEmitter?.particleBirthRate = 50
+        plasmaEngineEmitter?.particleSpeed = 25
+        paddleContainer.run(SKAction.rotate(toAngle: 0, duration: 0.15, shortestUnitArc: true))
+    }
+    
+    // MARK: - Frame Update Loop
     override func update(_ currentTime: TimeInterval) {
         guard let gameState = gameState else { return }
         
@@ -276,6 +330,7 @@ final class GameScene: SKScene {
         let currentMultiplier = 1.0 + (timeElapsed / 28.0)
         gameState.speedMultiplier = currentMultiplier
         
+        // Fever countdown lifecycle
         if feverTimeRemaining > 0 {
             feverTimeRemaining -= 1.0 / 60.0
             gameState.feverTimer = feverTimeRemaining
@@ -284,6 +339,7 @@ final class GameScene: SKScene {
             }
         }
         
+        // Adaptive spawn and fall rate scaling
         let baseSpawn = (feverTimeRemaining > 0) ? 0.35 : 0.85
         let baseFall = (feverTimeRemaining > 0) ? 2.4 : 3.2
         
@@ -296,17 +352,10 @@ final class GameScene: SKScene {
         }
         
         checkPaddleCollisions()
-        
-        for child in children {
-            if child.position.y < (paddleYPosition - 35) && child !== paddleNode && child !== paddleAuraNode && child !== dangerLineNode && child.name != "floatingText" && child.alpha > 0.01 {
-                if child.name == OrbType.target.identifier && feverTimeRemaining <= 0 {
-                    loseLife()
-                }
-                child.removeFromParent()
-            }
-        }
+        purgeOffscreenEntities()
     }
     
+    // MARK: - Entity Spawning
     private func spawnOrb() {
         let isFever = feverTimeRemaining > 0
         let orbType: OrbType
@@ -338,6 +387,7 @@ final class GameScene: SKScene {
         orb.lineWidth = 2.0
         orb.zPosition = 10
         
+        // Attach cloned particle exhaust trail
         if let template = templateEmitter, let emitter = template.copy() as? SKEmitterNode {
             emitter.particleColor = orbType.color
             emitter.targetNode = self
@@ -351,19 +401,26 @@ final class GameScene: SKScene {
         orb.run(moveDown)
     }
     
+    // MARK: - Collision Detection & Entity Handling
     private func checkPaddleCollisions() {
-        let paddleFrame = paddleNode.frame.insetBy(dx: -4, dy: -4)
+        let paddleFrame = CGRect(
+            x: paddleContainer.position.x - currentPaddleWidth / 2 - 4,
+            y: paddleContainer.position.y - paddleHeight / 2 - 4,
+            width: currentPaddleWidth + 8,
+            height: paddleHeight + 8
+        )
         
-        for child in children where child !== paddleNode && child !== paddleAuraNode && child !== dangerLineNode && child.name != "floatingText" && child.alpha > 0.01 {
+        for child in children where child !== paddleContainer && child.name != "floatingText" && child.alpha > 0.01 {
             guard let orb = child as? SKShapeNode, let name = orb.name else { continue }
             
+            // Magnet & Fever attraction mechanics
             if (isMagnetActive || feverTimeRemaining > 0) && (name == OrbType.target.identifier || name == OrbType.feverGold.identifier) && orb.position.y < size.height * 0.65 {
-                let dx = paddleNode.position.x - orb.position.x
+                let dx = paddleContainer.position.x - orb.position.x
                 orb.position.x += dx * 0.10
             }
             
             if paddleFrame.contains(orb.position) || paddleFrame.intersects(orb.frame) {
-                let distanceFromCenter = abs(orb.position.x - paddleNode.position.x)
+                let distanceFromCenter = abs(orb.position.x - paddleContainer.position.x)
                 let isEdgeDeflection = distanceFromCenter > (currentPaddleWidth * 0.36)
                 handleCatch(orb: orb, identifier: name, isEdge: isEdgeDeflection)
             }
@@ -431,6 +488,18 @@ final class GameScene: SKScene {
         }
     }
     
+    private func purgeOffscreenEntities() {
+        for child in children {
+            if child.position.y < (paddleYPosition - 35) && child !== paddleContainer && child.name != "floatingText" && child.alpha > 0.01 {
+                if child.name == OrbType.target.identifier && feverTimeRemaining <= 0 {
+                    loseLife()
+                }
+                child.removeFromParent()
+            }
+        }
+    }
+    
+    // MARK: - Powerups & Special Modes
     private func startFeverMode() {
         feverTimeRemaining = 5.0
         gameState?.isFeverActive = true
@@ -450,6 +519,90 @@ final class GameScene: SKScene {
         FeedbackManager.shared.resetFeverStreak()
     }
     
+    private func triggerWidePaddle() {
+        isWideActive = true
+        updatePaddleWidth(to: defaultPaddleWidth * 1.6)
+        refreshPaddleAesthetics()
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) { [weak self] in
+            guard let self = self else { return }
+            self.isWideActive = false
+            self.updatePaddleWidth(to: self.defaultPaddleWidth)
+            self.refreshPaddleAesthetics()
+            if self.gameState?.activePowerupText == "WIDE" {
+                self.gameState?.activePowerupText = ""
+            }
+        }
+    }
+    
+    private func triggerMagnet() {
+        isMagnetActive = true
+        refreshPaddleAesthetics()
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) { [weak self] in
+            guard let self = self else { return }
+            self.isMagnetActive = false
+            self.refreshPaddleAesthetics()
+            if self.gameState?.activePowerupText == "MAGNET" {
+                self.gameState?.activePowerupText = ""
+            }
+        }
+    }
+    
+    private func loseLife() {
+        guard let gameState = gameState, isPlaying else { return }
+        gameState.lives -= 1
+        gameState.resetCombo()
+        FeedbackManager.shared.playHazard()
+        shakeScreen(magnitude: 10)
+        
+        if gameState.lives <= 0 {
+            gameOver()
+        }
+    }
+    
+    // MARK: - Geometry & Aesthetics Mutators
+    private func updatePaddleWidth(to newWidth: CGFloat) {
+        currentPaddleWidth = newWidth
+        paddleChassis.path = createCyberpunkPath(width: newWidth, height: paddleHeight)
+        
+        let corePath = CGPath(
+            roundedRect: CGRect(x: -(newWidth - 28) / 2, y: -2, width: newWidth - 28, height: 4),
+            cornerWidth: 2,
+            cornerHeight: 2,
+            transform: nil
+        )
+        paddleCore.path = corePath
+        plasmaEngineEmitter?.particlePositionRange = CGVector(dx: newWidth * 0.65, dy: 2)
+    }
+    
+    private func refreshPaddleAesthetics() {
+        let skinColor = gameState?.selectedSkin.uiColor ?? .cyan
+        
+        if feverTimeRemaining > 0 {
+            paddleChassis.strokeColor = UIColor(red: 1.0, green: 0.88, blue: 0.2, alpha: 1.0)
+            paddleChassis.lineWidth = 3.0
+            paddleCore.fillColor = .yellow
+            plasmaEngineEmitter?.particleColor = .yellow
+        } else if isMagnetActive {
+            paddleChassis.strokeColor = .systemYellow
+            paddleChassis.lineWidth = 2.5
+            paddleCore.fillColor = .systemYellow
+            plasmaEngineEmitter?.particleColor = .systemYellow
+        } else if isWideActive {
+            paddleChassis.strokeColor = .systemGreen
+            paddleChassis.lineWidth = 2.5
+            paddleCore.fillColor = .systemGreen
+            plasmaEngineEmitter?.particleColor = .systemGreen
+        } else {
+            paddleChassis.strokeColor = skinColor
+            paddleChassis.lineWidth = 2.0
+            paddleCore.fillColor = skinColor
+            plasmaEngineEmitter?.particleColor = skinColor
+        }
+    }
+    
+    // MARK: - Visual Feedback FX
     private func showFloatingText(text: String, color: UIColor, at position: CGPoint) {
         let label = SKLabelNode(text: text)
         label.name = "floatingText"
@@ -496,48 +649,6 @@ final class GameScene: SKScene {
         }
     }
     
-    private func triggerWidePaddle() {
-        isWideActive = true
-        updatePaddleWidth(to: defaultPaddleWidth * 1.6)
-        refreshPaddleAesthetics()
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) { [weak self] in
-            guard let self = self else { return }
-            self.isWideActive = false
-            self.updatePaddleWidth(to: self.defaultPaddleWidth)
-            self.refreshPaddleAesthetics()
-            if self.gameState?.activePowerupText == "WIDE" {
-                self.gameState?.activePowerupText = ""
-            }
-        }
-    }
-    
-    private func triggerMagnet() {
-        isMagnetActive = true
-        refreshPaddleAesthetics()
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) { [weak self] in
-            guard let self = self else { return }
-            self.isMagnetActive = false
-            self.refreshPaddleAesthetics()
-            if self.gameState?.activePowerupText == "MAGNET" {
-                self.gameState?.activePowerupText = ""
-            }
-        }
-    }
-    
-    private func loseLife() {
-        guard let gameState = gameState, isPlaying else { return }
-        gameState.lives -= 1
-        gameState.resetCombo()
-        FeedbackManager.shared.playHazard()
-        shakeScreen(magnitude: 10)
-        
-        if gameState.lives <= 0 {
-            gameOver()
-        }
-    }
-    
     private func shakeScreen(magnitude: CGFloat = 10) {
         let shake = SKAction.sequence([
             SKAction.moveBy(x: -magnitude, y: 0, duration: 0.03),
@@ -545,12 +656,6 @@ final class GameScene: SKScene {
             SKAction.moveBy(x: -magnitude, y: 0, duration: 0.03)
         ])
         run(shake)
-    }
-    
-    private func gameOver() {
-        isPlaying = false
-        clearScene()
-        gameState?.isGameOver = true
     }
     
     private func createBurstEffect(at position: CGPoint, color: UIColor) {
@@ -575,5 +680,11 @@ final class GameScene: SKScene {
             let remove = SKAction.removeFromParent()
             spark.run(SKAction.sequence([group, remove]))
         }
+    }
+    
+    private func gameOver() {
+        isPlaying = false
+        clearScene()
+        gameState?.isGameOver = true
     }
 }
