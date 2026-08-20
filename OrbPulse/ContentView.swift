@@ -42,6 +42,10 @@ struct ContentView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
         }
+        // Boots the audio engine and starts ambient BGM immediately at app launch
+        .onAppear {
+            FeedbackManager.shared.warmUp()
+        }
         .animation(.easeInOut(duration: 0.25), value: gameState.isInMenu)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: gameState.isGameOver)
     }

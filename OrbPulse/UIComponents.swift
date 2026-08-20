@@ -192,6 +192,7 @@ struct LandingView: View {
                 // Interactive Selector (< Skin Name >)
                 HStack(spacing: 20) {
                     Button(action: {
+                        FeedbackManager.shared.playButtonClick()
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                             currentSkinIndex = (currentSkinIndex - 1 + allSkins.count) % allSkins.count
                             syncSkinSelection()
@@ -221,6 +222,7 @@ struct LandingView: View {
                                 .background(Capsule().fill(Color.green.opacity(0.2)))
                         } else if isUnlocked {
                             Button(action: {
+                                FeedbackManager.shared.playButtonClick()
                                 gameState.equipSkin(currentSkin)
                             }) {
                                 Text("TAP TO EQUIP")
@@ -232,6 +234,7 @@ struct LandingView: View {
                             }
                         } else {
                             Button(action: {
+                                FeedbackManager.shared.playButtonClick()
                                 _ = gameState.unlockSkin(currentSkin)
                             }) {
                                 HStack(spacing: 4) {
@@ -252,6 +255,7 @@ struct LandingView: View {
                     .frame(minWidth: 160)
                     
                     Button(action: {
+                        FeedbackManager.shared.playButtonClick()
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                             currentSkinIndex = (currentSkinIndex + 1) % allSkins.count
                             syncSkinSelection()
@@ -317,6 +321,7 @@ struct LandingView: View {
             
             // Play Button
             Button(action: {
+                FeedbackManager.shared.playButtonClick()
                 gameState.isInMenu = false
                 gameState.restartTrigger.toggle()
             }) {
@@ -486,6 +491,7 @@ struct PaddleLockerModal: View {
             // Action Button
             if isUnlocked {
                 Button(action: {
+                    FeedbackManager.shared.playButtonClick()
                     gameState.equipSkin(skin)
                 }) {
                     Text(isSelected ? "IN USE" : "EQUIP")
@@ -500,6 +506,7 @@ struct PaddleLockerModal: View {
                 .disabled(isSelected)
             } else {
                 Button(action: {
+                    FeedbackManager.shared.playButtonClick()
                     _ = gameState.unlockSkin(skin)
                 }) {
                     Text("UNLOCK")
@@ -640,6 +647,7 @@ struct GameOverModal: View {
                 // Action Controls
                 HStack(spacing: 10) {
                     Button(action: {
+                        FeedbackManager.shared.playButtonClick()
                         gameState.lastScore = gameState.score
                         gameState.isGameOver = false
                         gameState.isInMenu = true
@@ -704,6 +712,7 @@ struct GameOverModal: View {
     }
     
     private func triggerReplay() {
+        FeedbackManager.shared.playButtonClick()
         gameState.isGameOver = false
         gameState.restartTrigger = true
     }

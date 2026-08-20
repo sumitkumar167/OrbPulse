@@ -553,11 +553,14 @@ final class GameScene: SKScene {
         guard let gameState = gameState, isPlaying else { return }
         gameState.lives -= 1
         gameState.resetCombo()
-        FeedbackManager.shared.playHazard()
-        shakeScreen(magnitude: 10)
         
         if gameState.lives <= 0 {
+            // Immediate Game Over sound and haptic pulse on final hit
             gameOver()
+        } else {
+            // Standard hazard catch sound
+            FeedbackManager.shared.playHazard()
+            shakeScreen(magnitude: 10)
         }
     }
     
@@ -686,5 +689,8 @@ final class GameScene: SKScene {
         isPlaying = false
         clearScene()
         gameState?.isGameOver = true
+        // Plays Game Over Sound
+        FeedbackManager.shared.playGameOver()
+        shakeScreen(magnitude: 14)
     }
 }
